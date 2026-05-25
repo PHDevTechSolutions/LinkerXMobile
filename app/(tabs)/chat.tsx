@@ -104,7 +104,7 @@ export default function ChatScreen() {
     return (
       <TouchableOpacity
         style={styles.chatRow}
-        onPress={() => router.push(`/group/${item._id}`)}
+        onPress={() => router.push(`/group/${item._id}` as any)}
         activeOpacity={0.8}
       >
         <View style={styles.groupAvatarWrap}>
@@ -157,7 +157,7 @@ export default function ChatScreen() {
         <TouchableOpacity
           style={styles.newBtn}
           onPress={() => router.push(
-            activeTab === 'chats' ? '/new-chat' : `/new-group?type=${activeTab === 'groups' ? 'group' : 'community'}`
+            activeTab === 'chats' ? '/new-chat' : (`/new-group?type=${activeTab === 'groups' ? 'group' : 'community'}` as any)
           )}
         >
           <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.newBtnGradient}>

@@ -13,14 +13,27 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.linkerx.mobile"
+      "bundleIdentifier": "com.linkerx.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow Linker X to use your camera for video calls.",
+        "NSMicrophoneUsageDescription": "Allow Linker X to use your microphone for calls."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0D0D1A"
       },
-      "package": "com.linkerx.mobile"
+      "package": "com.linkerx.mobile",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "BLUETOOTH",
+        "READ_PHONE_STATE"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -36,6 +49,11 @@
     "scheme": "linkerx",
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
     }
   }
 }
