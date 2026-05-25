@@ -9,12 +9,12 @@ import { useLocalSearchParams, router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { Colors } from '@/constants/Colors';
 import Avatar from '@/components/Avatar';
-import { toast } from '@/lib/toast';
-import api from '@/lib/api';
 
-// Sanitize room name for Daily.co
-function getRoomName(id: string): string {
-  return `linkerx-${id}`.replace(/[^a-zA-Z0-9-]/g, '-').substring(0, 100);
+// Generate Jitsi room URL — no API key needed, 100% free
+function getJitsiUrl(id: string, displayName?: string): string {
+  const roomName = `LinkerX-${id}`.replace(/[^a-zA-Z0-9-]/g, '-');
+  const name = encodeURIComponent(displayName || 'User');
+  return `https://meet.jit.si/${roomName}#userInfo.displayName="${name}"`;
 }
 
 export default function CallScreen() {
@@ -25,79 +25,32 @@ export default function CallScreen() {
     avatar: string;
   }>();
 
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
-  const [roomUrl, setRoomUrl]   = useState<string | null>(null);
-  const roomName = getRoomName(id);
+  const [loading, setLoading] = useState(true);
+  const callUrl = getJitsiUrl(id, userName);
 
   useEffect(() => {
-    startCall();
+    openCall();
   }, []);
 
-  const startCall = async () => {
+  const openCall = async () => {
     try {
-      const { data } = await api.post('/api/calls/room', { roomName });
-      setRoomUrl(data.url);
-      await openCall(data.url);
-    } catch (err: any) {
-      const msg = err.response?.data?.message || 'Could not start call.';
-      setError(msg);
-      toast.error(msg);
+      if (Platform.OS === 'web') {
+        window.open(callUrl, '_blank');
+        setTimeout(() => router.back(), 500);
+      } else {
+        await WebBrowser.openBrowserAsync(callUrl, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+        });
+        router.back();
+      }
+    } catch {
+      await Linking.openURL(callUrl);
+      router.back();
     } finally {
       setLoading(false);
     }
   };
 
-  const openCall = async (url: string) => {
-    if (Platform.OS === 'web') {
-      // Web: navigate to the call URL in same tab
-      window.location.href = url;
-    } else {
-      // Mobile: open in in-app browser
-      try {
-        await WebBrowser.openBrowserAsync(url, {
-          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-        });
-      } catch {
-        // Fallback: open in system browser
-        await Linking.openURL(url);
-      }
-      router.back();
-    }
-  };
-
-  const handleRetry = () => {
-    setError(null);
-    setLoading(true);
-    startCall();
-  };
-
-  // Error state
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <LinearGradient colors={[Colors.purple + '33', Colors.bg]} style={StyleSheet.absoluteFill} />
-        <View style={styles.center}>
-          <View style={styles.errorIcon}>
-            <Ionicons name="videocam-off-outline" size={40} color={Colors.error} />
-          </View>
-          <Text style={styles.callerName}>{userName}</Text>
-          <Text style={styles.errorText}>{error}</Text>
-
-          <TouchableOpacity style={styles.retryBtn} onPress={handleRetry}>
-            <Ionicons name="refresh" size={16} color={Colors.white} />
-            <Text style={styles.retryText}>Try Again</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
-            <Text style={styles.cancelText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // Loading / connecting state
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -108,16 +61,15 @@ export default function CallScreen() {
         <Avatar uri={avatar} name={userName} size={90} />
         <Text style={styles.callerName}>{userName}</Text>
         <Text style={styles.callStatus}>
-          {loading ? 'Starting call...' : 'Opening call room...'}
+          {loading ? 'Starting video call...' : 'Opening Jitsi Meet...'}
         </Text>
         <ActivityIndicator color={Colors.purple} size="large" style={{ marginTop: 16 }} />
 
-        {roomUrl && (
-          <TouchableOpacity style={styles.openBtn} onPress={() => openCall(roomUrl)}>
-            <Ionicons name="videocam" size={16} color={Colors.white} />
-            <Text style={styles.openBtnText}>Open Call</Text>
-          </TouchableOpacity>
-        )}
+        {/* Manual open button in case auto-open fails */}
+        <TouchableOpacity style={styles.openBtn} onPress={openCall}>
+          <Ionicons name="videocam" size={16} color={Colors.white} />
+          <Text style={styles.openBtnText}>Open Call</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
           <Ionicons name="close" size={16} color={Colors.textMuted} />
@@ -133,18 +85,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24 },
   callerName: { color: Colors.white, fontSize: 24, fontWeight: '700' },
   callStatus: { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
-  errorIcon: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: Colors.error + '22',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  errorText: { color: Colors.error, fontSize: 14, textAlign: 'center' },
-  retryBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: Colors.purple, borderRadius: 12,
-    paddingHorizontal: 24, paddingVertical: 12, marginTop: 8,
-  },
-  retryText: { color: Colors.white, fontWeight: '700', fontSize: 14 },
   openBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: Colors.purple, borderRadius: 12,
