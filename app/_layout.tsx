@@ -28,6 +28,8 @@ export default function RootLayout() {
         <Stack.Screen name="settings" />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="new-chat" />
+        <Stack.Screen name="new-group" />
+        <Stack.Screen name="group/[id]" />
         <Stack.Screen name="user/[id]" />
         <Stack.Screen name="post/[id]" options={{ presentation: 'modal' }} />
       </Stack>
