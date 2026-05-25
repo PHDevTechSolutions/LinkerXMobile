@@ -14,26 +14,24 @@ router.post("/room", async (req, res) => {
     if (!roomName) return res.status(400).json({ message: "roomName is required." });
 
     if (!DAILY_API_KEY) {
-      console.error("DAILY_API_KEY is not set in environment variables");
-      return res.status(500).json({ message: "Video call service not configured. Please set DAILY_API_KEY." });
+      console.error("DAILY_API_KEY is not set");
+      return res.status(500).json({ message: "Video call not configured. Add DAILY_API_KEY to Railway environment variables." });
     }
 
-    // Daily.co only allows alphanumeric and hyphens, max 100 chars
+    // Sanitize: Daily only allows alphanumeric and hyphens, max 100 chars
     const safeName = roomName.replace(/[^a-zA-Z0-9-]/g, "-").substring(0, 100);
-    console.log(`Creating/fetching Daily room: ${safeName}`);
 
-    // Try to get existing room first
+    // 1. Try to get existing room
     const getRes = await fetch(`${DAILY_BASE_URL}/rooms/${safeName}`, {
       headers: { Authorization: `Bearer ${DAILY_API_KEY}` },
     });
 
     if (getRes.ok) {
       const room = await getRes.json();
-      console.log(`Found existing room: ${room.url}`);
       return res.status(200).json({ url: room.url, name: room.name });
     }
 
-    // Create new room
+    // 2. Create new room
     const createRes = await fetch(`${DAILY_BASE_URL}/rooms`, {
       method: "POST",
       headers: {
@@ -47,7 +45,6 @@ router.post("/room", async (req, res) => {
           exp: Math.floor(Date.now() / 1000) + 7200, // 2 hours
           enable_chat: true,
           enable_screenshare: true,
-          enable_knocking: false,
           max_participants: 50,
         },
       }),
@@ -62,7 +59,6 @@ router.post("/room", async (req, res) => {
       });
     }
 
-    console.log(`Created new room: ${createData.url}`);
     return res.status(200).json({ url: createData.url, name: createData.name });
 
   } catch (err) {
