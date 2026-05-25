@@ -137,10 +137,17 @@ export default function CallScreen() {
 
       socket.on('webrtc_end_call', () => endCall());
 
-      // Create and send offer
+      // Create and send offer with caller info
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      socket.emit('webrtc_offer', { targetUserId: id, offer, callId });
+      socket.emit('webrtc_offer', {
+        targetUserId: id,
+        offer,
+        callId,
+        callerName: user?.userName || 'Unknown',
+        callerAvatar: user?.avatar || null,
+        callType: type,
+      });
       setStatus('ringing');
 
     } catch (err) {

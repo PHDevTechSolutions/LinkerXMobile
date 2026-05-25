@@ -80,7 +80,17 @@ io.on("connection", (socket) => {
   });
 
   // ── WebRTC Signaling ──────────────────────────────────────────────────────
-  socket.on("webrtc_offer", ({ targetUserId, offer, callId }) => {
+  socket.on("webrtc_offer", ({ targetUserId, offer, callId, callerName, callerAvatar, callType }) => {
+    // Send incoming call notification to receiver
+    socket.to(`user_${targetUserId}`).emit("webrtc_incoming_call", {
+      callId,
+      callerId: socket.userId,
+      callerName: callerName || "Unknown",
+      callerAvatar: callerAvatar || null,
+      callType: callType || "video",
+      offer,
+    });
+    // Also send the offer directly
     socket.to(`user_${targetUserId}`).emit("webrtc_offer", {
       fromUserId: socket.userId,
       offer,
