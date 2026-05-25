@@ -77,6 +77,40 @@ io.on("connection", (socket) => {
     socket.to(`group_${groupId}`).emit("group_typing", { userId: socket.userId, userName });
   });
 
+  // ── WebRTC Signaling ──────────────────────────────────────────────────────
+  socket.on("webrtc_offer", ({ targetUserId, offer, callId }) => {
+    socket.to(`user_${targetUserId}`).emit("webrtc_offer", {
+      fromUserId: socket.userId,
+      offer,
+      callId,
+    });
+  });
+
+  socket.on("webrtc_answer", ({ targetUserId, answer, callId }) => {
+    socket.to(`user_${targetUserId}`).emit("webrtc_answer", {
+      fromUserId: socket.userId,
+      answer,
+      callId,
+    });
+  });
+
+  socket.on("webrtc_ice_candidate", ({ targetUserId, candidate, callId }) => {
+    socket.to(`user_${targetUserId}`).emit("webrtc_ice_candidate", {
+      fromUserId: socket.userId,
+      candidate,
+      callId,
+    });
+  });
+
+  socket.on("webrtc_end_call", ({ targetUserId, callId }) => {
+    socket.to(`user_${targetUserId}`).emit("webrtc_end_call", { callId });
+  });
+
+  // Join personal room for receiving calls
+  socket.on("join_user_room", () => {
+    socket.join(`user_${socket.userId}`);
+  });
+
   socket.on("send_group_message", async ({ groupId, text }) => {
     try {
       const { ObjectId } = require("mongodb");
