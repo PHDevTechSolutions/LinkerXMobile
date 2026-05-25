@@ -125,8 +125,11 @@ export default function CallScreen() {
   }
 
   // ── Mobile — WebView with Daily.co ────────────────────────────────────────
-  // Use expo-web-browser or WebView to open the Daily room
-  const { WebView } = require('react-native-webview');
+  // Dynamic require — only runs on native, never on web
+  let WebView: any = null;
+  if (!IS_WEB) {
+    WebView = require('react-native-webview').WebView;
+  }
 
   return (
     <View style={styles.container}>
