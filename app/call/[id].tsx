@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Platform, ActivityIndicator,
@@ -8,7 +8,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import Avatar from '@/components/Avatar';
-import { AGORA_APP_ID, getChannelName } from '@/lib/agora';
+import { getRoomName } from '@/lib/daily';
+import { toast } from '@/lib/toast';
+import api from '@/lib/api';
 
 const IS_WEB = Platform.OS === 'web';
 
@@ -20,244 +22,186 @@ export default function CallScreen() {
     avatar: string;
   }>();
 
-  const [joined, setJoined]             = useState(false);
-  const [remoteUid, setRemoteUid]       = useState<number | null>(null);
-  const [muted, setMuted]               = useState(false);
-  const [videoOff, setVideoOff]         = useState(false);
-  const [speakerOn, setSpeakerOn]       = useState(true);
-  const [callDuration, setCallDuration] = useState(0);
-  const engineRef = useRef<any>(null);
-  const timerRef  = useRef<any>(null);
-  const channelName = getChannelName(id);
+  const [roomUrl, setRoomUrl]   = useState<string | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [callActive, setCallActive] = useState(false);
+  const callFrameRef = useRef<any>(null);
+  const roomName = getRoomName(id);
 
   useEffect(() => {
-    if (IS_WEB) return;
-    initAgora();
-    return () => { endCall(false); };
+    createRoom();
+    return () => { leaveCall(); };
   }, []);
 
-  useEffect(() => {
-    if (joined) {
-      timerRef.current = setInterval(() => setCallDuration((d) => d + 1), 1000);
-    }
-    return () => clearInterval(timerRef.current);
-  }, [joined]);
-
-  const initAgora = async () => {
+  const createRoom = async () => {
     try {
-      const {
-        createAgoraRtcEngine,
-        ChannelProfileType,
-        ClientRoleType,
-      } = require('react-native-agora');
-
-      const engine = createAgoraRtcEngine();
-      engineRef.current = engine;
-
-      engine.initialize({
-        appId: AGORA_APP_ID,
-        channelProfile: ChannelProfileType.ChannelProfileCommunication,
-      });
-
-      engine.registerEventHandler({
-        onJoinChannelSuccess: () => setJoined(true),
-        onUserJoined: (_connection: any, uid: number) => setRemoteUid(uid),
-        onUserOffline: () => { setRemoteUid(null); endCall(false); },
-        onError: (err: any) => console.error('Agora error:', err),
-      });
-
-      if (type === 'video') {
-        engine.enableVideo();
-        engine.startPreview();
+      const { data } = await api.post('/api/calls/room', { roomName });
+      setRoomUrl(data.url);
+      if (IS_WEB) {
+        initDailyWeb(data.url);
       }
-
-      engine.joinChannel(null, channelName, 0, {
-        clientRoleType: ClientRoleType.ClientRoleBroadcaster,
-      });
     } catch (err) {
-      console.error('Agora init error:', err);
+      toast.error('Could not start call.');
+      router.back();
+    } finally {
+      setLoading(false);
     }
   };
 
-  const endCall = async (navigate = true) => {
-    clearInterval(timerRef.current);
-    if (engineRef.current) {
-      engineRef.current.leaveChannel();
-      engineRef.current.release();
-      engineRef.current = null;
+  const initDailyWeb = async (url: string) => {
+    try {
+      const DailyIframe = (await import('@daily-co/daily-js')).default;
+      const container = document.getElementById('daily-call-container');
+      if (!container) return;
+
+      callFrameRef.current = DailyIframe.createFrame(container, {
+        iframeStyle: {
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          borderRadius: '0px',
+        },
+        showLeaveButton: false,
+        showFullscreenButton: true,
+      });
+
+      callFrameRef.current.on('joined-meeting', () => setCallActive(true));
+      callFrameRef.current.on('left-meeting', () => { setCallActive(false); router.back(); });
+      callFrameRef.current.on('error', () => { toast.error('Call error.'); router.back(); });
+
+      await callFrameRef.current.join({ url });
+    } catch (err) {
+      console.error('Daily init error:', err);
     }
-    if (navigate) router.back();
   };
 
-  const toggleMute = () => {
-    engineRef.current?.muteLocalAudioStream(!muted);
-    setMuted(!muted);
+  const leaveCall = () => {
+    if (callFrameRef.current) {
+      callFrameRef.current.leave();
+      callFrameRef.current.destroy();
+      callFrameRef.current = null;
+    }
   };
 
-  const toggleVideo = () => {
-    engineRef.current?.muteLocalVideoStream(!videoOff);
-    setVideoOff(!videoOff);
+  const handleEndCall = () => {
+    leaveCall();
+    router.back();
   };
 
-  const toggleSpeaker = () => {
-    engineRef.current?.setEnableSpeakerphone(!speakerOn);
-    setSpeakerOn(!speakerOn);
-  };
-
-  const formatDuration = (secs: number) => {
-    const m = Math.floor(secs / 60).toString().padStart(2, '0');
-    const s = (secs % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-  };
-
-  // ── Web fallback ─────────────────────────────────────────────────────────
-  if (IS_WEB) {
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (loading) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={[Colors.purple + '44', Colors.bg, Colors.bg]} style={StyleSheet.absoluteFill} />
-        <View style={styles.webFallback}>
-          <Ionicons name="videocam-off-outline" size={56} color={Colors.textMuted} />
-          <Text style={styles.webFallbackTitle}>Video calls not supported on web</Text>
-          <Text style={styles.webFallbackText}>Install the LinkerX mobile app to make video calls.</Text>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backBtnText}>Go Back</Text>
-          </TouchableOpacity>
+        <LinearGradient colors={[Colors.purple + '55', Colors.bg]} style={StyleSheet.absoluteFill} />
+        <View style={styles.loadingWrap}>
+          <Avatar uri={avatar} name={userName} size={90} />
+          <Text style={styles.callerName}>{userName}</Text>
+          <Text style={styles.callStatus}>Starting call...</Text>
+          <ActivityIndicator color={Colors.purple} style={{ marginTop: 16 }} />
         </View>
       </View>
     );
   }
 
-  // ── Mobile call UI ────────────────────────────────────────────────────────
-  const { RtcSurfaceView, VideoSourceType } = require('react-native-agora');
+  // ── Web — Daily.co iframe ─────────────────────────────────────────────────
+  if (IS_WEB) {
+    return (
+      <View style={styles.container}>
+        {/* Daily.co iframe container */}
+        <div
+          id="daily-call-container"
+          style={{ width: '100%', height: '100%', backgroundColor: '#0D0D1A' }}
+        />
+
+        {/* End call overlay button */}
+        <View style={styles.endCallOverlay}>
+          <TouchableOpacity style={styles.endCallBtn} onPress={handleEndCall}>
+            <Ionicons name="call" size={26} color={Colors.white} style={{ transform: [{ rotate: '135deg' }] }} />
+          </TouchableOpacity>
+          <Text style={styles.endCallLabel}>End Call</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // ── Mobile — WebView with Daily.co ────────────────────────────────────────
+  // Use expo-web-browser or WebView to open the Daily room
+  const { WebView } = require('react-native-webview');
 
   return (
     <View style={styles.container}>
-      {/* Remote video */}
-      {type === 'video' && remoteUid !== null ? (
-        <RtcSurfaceView
-          style={StyleSheet.absoluteFill}
-          canvas={{ uid: remoteUid, sourceType: VideoSourceType.VideoSourceRemote }}
+      {/* Header */}
+      <View style={styles.mobileHeader}>
+        <TouchableOpacity onPress={handleEndCall} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.mobileHeaderTitle}>{userName}</Text>
+        <TouchableOpacity style={styles.endCallBtnSmall} onPress={handleEndCall}>
+          <Ionicons name="call" size={18} color={Colors.white} style={{ transform: [{ rotate: '135deg' }] }} />
+        </TouchableOpacity>
+      </View>
+
+      {roomUrl ? (
+        <WebView
+          source={{ uri: roomUrl }}
+          style={{ flex: 1 }}
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          javaScriptEnabled
+          domStorageEnabled
+          onError={() => { toast.error('Call error.'); router.back(); }}
         />
       ) : (
-        <LinearGradient
-          colors={[Colors.purple + '55', Colors.bg]}
-          style={[StyleSheet.absoluteFill, styles.noVideoBackground]}
-        >
-          <Avatar uri={avatar} name={userName} size={100} />
-          <Text style={styles.callerName}>{userName}</Text>
-          <Text style={styles.callStatus}>
-            {!joined ? 'Connecting...' : remoteUid === null ? 'Ringing...' : formatDuration(callDuration)}
-          </Text>
-          {!joined && <ActivityIndicator color={Colors.purple} style={{ marginTop: 12 }} />}
-        </LinearGradient>
-      )}
-
-      {/* Local video preview */}
-      {type === 'video' && joined && !videoOff && (
-        <View style={styles.localVideo}>
-          <RtcSurfaceView
-            style={StyleSheet.absoluteFill}
-            canvas={{ uid: 0, sourceType: VideoSourceType.VideoSourceCamera }}
-          />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={Colors.purple} size="large" />
         </View>
       )}
-
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.topBtn}>
-          <Ionicons name="chevron-down" size={24} color={Colors.white} />
-        </TouchableOpacity>
-        <View style={styles.topInfo}>
-          <Text style={styles.topName}>{userName}</Text>
-          {joined && remoteUid !== null && (
-            <Text style={styles.topDuration}>{formatDuration(callDuration)}</Text>
-          )}
-        </View>
-        <View style={{ width: 40 }} />
-      </View>
-
-      {/* Controls */}
-      <View style={styles.controls}>
-        <TouchableOpacity style={styles.controlBtn} onPress={toggleMute}>
-          <View style={[styles.controlBtnInner, muted && styles.controlBtnActive]}>
-            <Ionicons name={muted ? 'mic-off' : 'mic'} size={24} color={Colors.white} />
-          </View>
-          <Text style={styles.controlLabel}>{muted ? 'Unmute' : 'Mute'}</Text>
-        </TouchableOpacity>
-
-        {type === 'video' && (
-          <TouchableOpacity style={styles.controlBtn} onPress={toggleVideo}>
-            <View style={[styles.controlBtnInner, videoOff && styles.controlBtnActive]}>
-              <Ionicons name={videoOff ? 'videocam-off' : 'videocam'} size={24} color={Colors.white} />
-            </View>
-            <Text style={styles.controlLabel}>{videoOff ? 'Show' : 'Hide'}</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity style={styles.controlBtn} onPress={toggleSpeaker}>
-          <View style={[styles.controlBtnInner, !speakerOn && styles.controlBtnActive]}>
-            <Ionicons name={speakerOn ? 'volume-high' : 'volume-mute'} size={24} color={Colors.white} />
-          </View>
-          <Text style={styles.controlLabel}>{speakerOn ? 'Speaker' : 'Earpiece'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.controlBtn} onPress={() => endCall(true)}>
-          <View style={styles.endCallBtn}>
-            <Ionicons name="call" size={26} color={Colors.white} style={{ transform: [{ rotate: '135deg' }] }} />
-          </View>
-          <Text style={styles.controlLabel}>End</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  noVideoBackground: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  callerName: { color: Colors.white, fontSize: 26, fontWeight: '700', marginTop: 16 },
-  callStatus: { color: 'rgba(255,255,255,0.7)', fontSize: 15 },
-  localVideo: {
-    position: 'absolute', top: 100, right: 16,
-    width: 100, height: 140, borderRadius: 14,
-    overflow: 'hidden', borderWidth: 2, borderColor: Colors.white,
+
+  loadingWrap: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12,
   },
-  topBar: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    flexDirection: 'row', alignItems: 'center',
-    paddingTop: 52, paddingHorizontal: 16, paddingBottom: 12,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+  callerName: { color: Colors.white, fontSize: 24, fontWeight: '700' },
+  callStatus: { color: 'rgba(255,255,255,0.7)', fontSize: 14 },
+
+  endCallOverlay: {
+    position: 'absolute', bottom: 40,
+    left: 0, right: 0,
+    alignItems: 'center', gap: 8,
   },
-  topBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  topInfo: { flex: 1, alignItems: 'center' },
-  topName: { color: Colors.white, fontSize: 16, fontWeight: '700' },
-  topDuration: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 },
-  controls: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'flex-end',
-    paddingBottom: 48, paddingTop: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  controlBtn: { alignItems: 'center', gap: 8 },
-  controlBtnInner: {
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  controlBtnActive: { backgroundColor: 'rgba(255,255,255,0.4)' },
-  controlLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
   endCallBtn: {
     width: 64, height: 64, borderRadius: 32,
     backgroundColor: Colors.error,
     alignItems: 'center', justifyContent: 'center',
+    shadowColor: Colors.error,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  webFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 32 },
-  webFallbackTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  webFallbackText: { color: Colors.textMuted, fontSize: 14, textAlign: 'center' },
+  endCallLabel: { color: Colors.white, fontSize: 13, fontWeight: '600' },
+
+  mobileHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 12, paddingTop: 52, paddingBottom: 12,
+    backgroundColor: Colors.bgCard,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+    gap: 10,
+  },
   backBtn: {
-    marginTop: 8, paddingHorizontal: 24, paddingVertical: 12,
-    backgroundColor: Colors.bgCard, borderRadius: 12,
-    borderWidth: 1, borderColor: Colors.border,
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: Colors.bgElevated,
+    alignItems: 'center', justifyContent: 'center',
   },
-  backBtnText: { color: Colors.purple, fontWeight: '600' },
+  mobileHeaderTitle: { flex: 1, color: Colors.textPrimary, fontWeight: '700', fontSize: 16 },
+  endCallBtnSmall: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: Colors.error,
+    alignItems: 'center', justifyContent: 'center',
+  },
 });
