@@ -2,11 +2,7 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import { getItem, removeItem } from '@/lib/storage';
 
-// localhost for web/iOS simulator, 10.0.2.2 for Android emulator, or your machine IP for physical device
-export const BASE_URL =
-  Platform.OS === 'web'
-    ? 'http://localhost:3000'
-    : 'http://192.168.0.211:3000';
+export const BASE_URL = 'https://linkerxmobile-production.up.railway.app';
 
 const api = axios.create({
   baseURL: BASE_URL,
