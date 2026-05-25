@@ -30,7 +30,7 @@ router.get("/", async (req, res) => {
 // POST /api/comments
 router.post("/", async (req, res) => {
   try {
-    const { postId, text } = req.body;
+    const { postId, text, parentId = null } = req.body;
     if (!postId || !text) return res.status(400).json({ message: "postId and text are required." });
 
     const db = await connectToDatabase();
@@ -39,26 +39,48 @@ router.post("/", async (req, res) => {
 
     const comment = {
       postId,
+      parentId, // null = top-level, string = reply to comment
       text,
       author: {
         _id: author._id.toString(),
         userName: author.userName,
         avatar: author.avatar || null,
       },
+      likes: [],
       createdAt: new Date(),
     };
 
     const result = await db.collection("comments").insertOne(comment);
 
-    // Increment commentsCount on post
-    await db.collection("posts").updateOne(
-      { _id: new ObjectId(postId) },
-      { $inc: { commentsCount: 1 } }
-    );
+    // Only increment commentsCount for top-level comments
+    if (!parentId) {
+      await db.collection("posts").updateOne(
+        { _id: new ObjectId(postId) },
+        { $inc: { commentsCount: 1 } }
+      );
+    }
 
     return res.status(201).json({ comment: { ...comment, _id: result.insertedId.toString() } });
   } catch (err) {
     console.error("Add comment error:", err);
+    return res.status(500).json({ message: "Server error." });
+  }
+});
+
+// POST /api/comments/:id/like
+router.post("/:id/like", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const comment = await db.collection("comments").findOne({ _id: new ObjectId(req.params.id) });
+    if (!comment) return res.status(404).json({ message: "Comment not found." });
+
+    const liked = comment.likes?.includes(req.user.userId);
+    await db.collection("comments").updateOne(
+      { _id: new ObjectId(req.params.id) },
+      liked ? { $pull: { likes: req.user.userId } } : { $push: { likes: req.user.userId } }
+    );
+    return res.status(200).json({ liked: !liked });
+  } catch (err) {
     return res.status(500).json({ message: "Server error." });
   }
 });

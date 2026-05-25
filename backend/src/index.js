@@ -12,8 +12,10 @@ const profileRoutes = require("./routes/profile");
 const commentsRoutes = require("./routes/comments");
 const chatRoutes    = require("./routes/chat");
 const usersRoutes   = require("./routes/users");
-const groupsRoutes  = require("./routes/groups");
-const callsRoutes   = require("./routes/calls");
+const groupsRoutes   = require("./routes/groups");
+const callsRoutes    = require("./routes/calls");
+const storiesRoutes  = require("./routes/stories");
+const reactionsRoutes = require("./routes/reactions");
 
 const app    = express();
 const server = http.createServer(app);
@@ -161,8 +163,10 @@ app.use("/api/profile",  profileRoutes);
 app.use("/api/comments", commentsRoutes);
 app.use("/api/chat",     chatRoutes);
 app.use("/api/users",    usersRoutes);
-app.use("/api/groups",   groupsRoutes);
-app.use("/api/calls",    callsRoutes);
+app.use("/api/groups",    groupsRoutes);
+app.use("/api/calls",     callsRoutes);
+app.use("/api/stories",   storiesRoutes);
+app.use("/api/reactions", reactionsRoutes);
 
 app.get("/", (_req, res) => res.json({ status: "LinkerX API is running 🚀" }));
 

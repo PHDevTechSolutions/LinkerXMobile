@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
 import PostCard, { Post } from '@/components/PostCard';
 import Avatar from '@/components/Avatar';
+import Stories from '@/components/Stories';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
 
@@ -75,14 +76,7 @@ export default function FeedScreen() {
   );
 
   const renderStory = () => (
-    <View style={styles.storyBar}>
-      <TouchableOpacity style={styles.addStory}>
-        <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.addStoryGradient}>
-          <Ionicons name="add" size={22} color={Colors.white} />
-        </LinearGradient>
-        <Text style={styles.storyLabel}>Your Story</Text>
-      </TouchableOpacity>
-    </View>
+    <Stories />
   );
 
   if (loading) {
