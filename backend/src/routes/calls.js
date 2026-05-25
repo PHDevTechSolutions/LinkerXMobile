@@ -14,14 +14,13 @@ router.post("/room", async (req, res) => {
     if (!roomName) return res.status(400).json({ message: "roomName is required." });
 
     if (!DAILY_API_KEY) {
-      console.error("DAILY_API_KEY is not set");
-      return res.status(500).json({ message: "Video call not configured. Add DAILY_API_KEY to Railway environment variables." });
+      return res.status(500).json({ message: "DAILY_API_KEY not configured." });
     }
 
     // Sanitize: Daily only allows alphanumeric and hyphens, max 100 chars
     const safeName = roomName.replace(/[^a-zA-Z0-9-]/g, "-").substring(0, 100);
 
-    // 1. Try to get existing room
+    // 1. Try to get existing room first
     const getRes = await fetch(`${DAILY_BASE_URL}/rooms/${safeName}`, {
       headers: { Authorization: `Bearer ${DAILY_API_KEY}` },
     });
@@ -31,7 +30,7 @@ router.post("/room", async (req, res) => {
       return res.status(200).json({ url: room.url, name: room.name });
     }
 
-    // 2. Create new room
+    // 2. Create new room — minimal properties only
     const createRes = await fetch(`${DAILY_BASE_URL}/rooms`, {
       method: "POST",
       headers: {
@@ -41,12 +40,6 @@ router.post("/room", async (req, res) => {
       body: JSON.stringify({
         name: safeName,
         privacy: "public",
-        properties: {
-          exp: Math.floor(Date.now() / 1000) + 7200, // 2 hours
-          enable_chat: true,
-          enable_screenshare: true,
-          max_participants: 50,
-        },
       }),
     });
 
@@ -55,7 +48,7 @@ router.post("/room", async (req, res) => {
     if (!createRes.ok) {
       console.error("Daily API error:", JSON.stringify(createData));
       return res.status(500).json({
-        message: createData.error || createData.info || "Failed to create call room.",
+        message: createData.info || createData.error || "Failed to create room.",
       });
     }
 
