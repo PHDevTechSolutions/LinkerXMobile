@@ -41,6 +41,10 @@ io.use((socket, next) => {
 io.on("connection", (socket) => {
   console.log(`🔌 Socket connected: ${socket.userId}`);
 
+  // Auto-join personal room for receiving calls
+  socket.join(`user_${socket.userId}`);
+  console.log(`📱 User ${socket.userId} joined personal room`);
+
   // ── Direct chat ──────────────────────────────────────────────────────────
   socket.on("join_room",  (chatId) => socket.join(chatId));
   socket.on("leave_room", (chatId) => socket.leave(chatId));

@@ -55,13 +55,26 @@ export default function RootLayout() {
   useEffect(() => {
     if (!token) return;
     const socket = getSocket(token);
-    socket.emit('join_user_room');
 
-    socket.on('webrtc_incoming_call', (data: any) => {
-      setIncomingCall(data);
-    });
+    const joinAndListen = () => {
+      socket.emit('join_user_room');
+      socket.on('webrtc_incoming_call', (data: any) => {
+        setIncomingCall(data);
+      });
+    };
 
-    return () => { socket.off('webrtc_incoming_call'); };
+    // If already connected, join immediately
+    if (socket.connected) {
+      joinAndListen();
+    } else {
+      // Wait for connection
+      socket.on('connect', joinAndListen);
+    }
+
+    return () => {
+      socket.off('connect', joinAndListen);
+      socket.off('webrtc_incoming_call');
+    };
   }, [token]);
 
   return (
