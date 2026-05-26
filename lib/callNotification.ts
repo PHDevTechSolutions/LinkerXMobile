@@ -16,7 +16,8 @@ export async function requestNotificationPermission(): Promise<boolean> {
 /**
  * Shows a browser system notification for an incoming call.
  * Works even when the tab is in the background or minimized.
- * Returns the Notification instance so it can be closed on accept/decline.
+ * The actual ringtone is handled by playCallSound() in sounds.ts.
+ * Returns a cleanup function.
  */
 export function showCallNotification(
   callerName: string,
@@ -28,7 +29,6 @@ export function showCallNotification(
   if (typeof Notification === 'undefined') return null;
   if (Notification.permission !== 'granted') return null;
 
-  const icon = 'https://res.cloudinary.com/dxnk3mexu/image/upload/v1/linkerx/icon.png';
   const title = callType === 'video' ? '📹 Incoming Video Call' : '📞 Incoming Voice Call';
   const body  = `${callerName} is calling you...`;
 
@@ -36,10 +36,9 @@ export function showCallNotification(
   try {
     notif = new Notification(title, {
       body,
-      icon,
       tag: 'incoming-call',       // replaces any previous call notification
       requireInteraction: true,   // stays until user interacts
-      silent: false,
+      silent: true,               // we handle sound ourselves via call.mp3
     });
 
     notif.onclick = () => {
@@ -47,45 +46,16 @@ export function showCallNotification(
       notif?.close();
       onAccept();
     };
-
-    notif.onclose = () => {};
   } catch (_) {}
 
-  // Play a ringtone using Web Audio API
-  let audioCtx: AudioContext | null = null;
-  let ringInterval: ReturnType<typeof setInterval> | null = null;
-
-  try {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-
-    const playBeep = () => {
-      if (!audioCtx) return;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.frequency.value = 440;
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
-      osc.start(audioCtx.currentTime);
-      osc.stop(audioCtx.currentTime + 0.4);
-    };
-
-    playBeep();
-    ringInterval = setInterval(playBeep, 1200);
-  } catch (_) {}
-
-  // Return cleanup function
   return () => {
     notif?.close();
-    if (ringInterval) clearInterval(ringInterval);
-    if (audioCtx) audioCtx.close().catch(() => {});
   };
 }
 
 /**
- * Shows a browser tab title flash to alert the user.
+ * Flashes the browser tab title to alert the user when tab is in background.
+ * Returns a cleanup function that restores the original title.
  */
 export function flashTabTitle(callerName: string): () => void {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return () => {};
