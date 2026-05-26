@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Image, Text, StyleSheet, ViewStyle } from 'react-native';
+import { View, Image, Text, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors } from '@/constants/Colors';
+import { useColors } from '@/hooks/useColors';
 
 type Props = {
   uri?: string;
@@ -11,6 +11,7 @@ type Props = {
 };
 
 export default function Avatar({ uri, name, size = 40, style }: Props) {
+  const C = useColors();
   const initials = name
     ? name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)
     : '?';
@@ -19,17 +20,12 @@ export default function Avatar({ uri, name, size = 40, style }: Props) {
     return (
       <View style={[{ width: size, height: size, borderRadius: size / 2 }, style]}>
         <LinearGradient
-          colors={[Colors.purple, Colors.cyan]}
-          style={[StyleSheet.absoluteFillObject, { borderRadius: size / 2, padding: 2 }]}
+          colors={[C.purple, C.cyan]}
+          style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: size / 2, padding: 2 }]}
         />
         <Image
           source={{ uri }}
-          style={{
-            width: size - 4,
-            height: size - 4,
-            borderRadius: (size - 4) / 2,
-            margin: 2,
-          }}
+          style={{ width: size - 4, height: size - 4, borderRadius: (size - 4) / 2, margin: 2 }}
         />
       </View>
     );
@@ -37,14 +33,12 @@ export default function Avatar({ uri, name, size = 40, style }: Props) {
 
   return (
     <LinearGradient
-      colors={[Colors.purple, Colors.cyan]}
+      colors={[C.purple, C.cyan]}
       style={[{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }, style]}
     >
-      <Text style={{ color: Colors.white, fontSize: size * 0.35, fontWeight: '700' }}>
+      <Text style={{ color: C.white, fontSize: size * 0.35, fontWeight: '700' }}>
         {initials}
       </Text>
     </LinearGradient>
   );
 }
-
-const styles = StyleSheet.create({});

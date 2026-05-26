@@ -6,8 +6,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Colors } from '@/constants/Colors';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useColors } from '@/hooks/useColors';
 
 export default function SettingsScreen() {
   const {
@@ -17,14 +17,17 @@ export default function SettingsScreen() {
     loadSettings, setTheme, toggleNotifications,
   } = useSettingsStore();
 
+  // C is reactive — re-renders when theme changes
+  const C = useColors();
+
   useEffect(() => { loadSettings(); }, []);
 
   const SectionHeader = ({ title }: { title: string }) => (
-    <Text style={styles.sectionHeader}>{title}</Text>
+    <Text style={[styles.sectionHeader, { color: C.textMuted }]}>{title}</Text>
   );
 
   const SettingRow = ({
-    icon, label, sublabel, value, onToggle, color = Colors.purple,
+    icon, label, sublabel, value, onToggle, color,
   }: {
     icon: React.ComponentProps<typeof Ionicons>['name'];
     label: string;
@@ -32,93 +35,111 @@ export default function SettingsScreen() {
     value: boolean;
     onToggle: () => void;
     color?: string;
-  }) => (
-    <View style={styles.row}>
-      <View style={[styles.rowIcon, { backgroundColor: color + '22' }]}>
-        <Ionicons name={icon} size={18} color={color} />
+  }) => {
+    const iconColor = color || C.purple;
+    return (
+      <View style={styles.row}>
+        <View style={[styles.rowIcon, { backgroundColor: iconColor + '22' }]}>
+          <Ionicons name={icon} size={18} color={iconColor} />
+        </View>
+        <View style={styles.rowText}>
+          <Text style={[styles.rowLabel, { color: C.textPrimary }]}>{label}</Text>
+          {sublabel ? <Text style={[styles.rowSublabel, { color: C.textMuted }]}>{sublabel}</Text> : null}
+        </View>
+        <Switch
+          value={value}
+          onValueChange={onToggle}
+          trackColor={{ false: C.border, true: C.purple + '88' }}
+          thumbColor={value ? C.purple : C.textMuted}
+        />
       </View>
-      <View style={styles.rowText}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        {sublabel ? <Text style={styles.rowSublabel}>{sublabel}</Text> : null}
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onToggle}
-        trackColor={{ false: Colors.border, true: Colors.purple + '88' }}
-        thumbColor={value ? Colors.purple : Colors.textMuted}
-      />
-    </View>
-  );
+    );
+  };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: C.bg }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+      <View style={[styles.header, { backgroundColor: C.bgCard, borderBottomColor: C.border }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[styles.backBtn, { backgroundColor: C.bgElevated }]}
+        >
+          <Ionicons name="arrow-back" size={22} color={C.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={[styles.headerTitle, { color: C.textPrimary }]}>Settings</Text>
         <View style={{ width: 38 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
 
-        {/* Theme */}
+        {/* ── Appearance ── */}
         <SectionHeader title="APPEARANCE" />
-        <View style={styles.card}>
-          <Text style={styles.rowLabel}>Theme</Text>
-          <Text style={styles.rowSublabel}>Choose your preferred look</Text>
+        <View style={[styles.card, { backgroundColor: C.bgCard, borderColor: C.border }]}>
+          <Text style={[styles.rowLabel, { color: C.textPrimary }]}>Theme</Text>
+          <Text style={[styles.rowSublabel, { color: C.textMuted }]}>Choose your preferred look</Text>
           <View style={styles.themeRow}>
+            {/* Dark */}
             <TouchableOpacity
-              style={[styles.themeBtn, theme === 'dark' && styles.themeBtnActive]}
+              style={[
+                styles.themeBtn,
+                { backgroundColor: C.bgElevated, borderColor: theme === 'dark' ? C.purple : C.border },
+              ]}
               onPress={() => setTheme('dark')}
             >
               {theme === 'dark' ? (
-                <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.themeBtnGradient}>
-                  <Ionicons name="moon" size={18} color={Colors.white} />
-                  <Text style={styles.themeLabelActive}>Dark</Text>
+                <LinearGradient colors={[C.purple, C.cyan]} style={styles.themeBtnGradient}>
+                  <Ionicons name="moon" size={18} color={C.white} />
+                  <Text style={[styles.themeLabelActive, { color: C.white }]}>Dark</Text>
                 </LinearGradient>
               ) : (
                 <>
-                  <Ionicons name="moon-outline" size={18} color={Colors.textMuted} />
-                  <Text style={styles.themeLabel}>Dark</Text>
+                  <Ionicons name="moon-outline" size={18} color={C.textMuted} />
+                  <Text style={[styles.themeLabel, { color: C.textMuted }]}>Dark</Text>
                 </>
               )}
             </TouchableOpacity>
 
+            {/* Light */}
             <TouchableOpacity
-              style={[styles.themeBtn, theme === 'light' && styles.themeBtnActive]}
+              style={[
+                styles.themeBtn,
+                { backgroundColor: C.bgElevated, borderColor: theme === 'light' ? C.purple : C.border },
+              ]}
               onPress={() => setTheme('light')}
             >
               {theme === 'light' ? (
-                <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.themeBtnGradient}>
-                  <Ionicons name="sunny" size={18} color={Colors.white} />
-                  <Text style={styles.themeLabelActive}>Light</Text>
+                <LinearGradient colors={[C.purple, C.cyan]} style={styles.themeBtnGradient}>
+                  <Ionicons name="sunny" size={18} color={C.white} />
+                  <Text style={[styles.themeLabelActive, { color: C.white }]}>Light</Text>
                 </LinearGradient>
               ) : (
                 <>
-                  <Ionicons name="sunny-outline" size={18} color={Colors.textMuted} />
-                  <Text style={styles.themeLabel}>Light</Text>
+                  <Ionicons name="sunny-outline" size={18} color={C.textMuted} />
+                  <Text style={[styles.themeLabel, { color: C.textMuted }]}>Light</Text>
                 </>
               )}
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Notifications */}
+        {/* ── Notifications ── */}
         <SectionHeader title="NOTIFICATIONS" />
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: C.bgCard, borderColor: C.border }]}>
           <SettingRow
             icon="notifications"
             label="Enable Notifications"
             sublabel="Master toggle for all notifications"
             value={notificationsEnabled}
             onToggle={() => toggleNotifications('notificationsEnabled')}
-            color={Colors.cyan}
+            color={C.cyan}
           />
         </View>
 
-        <View style={[styles.card, !notificationsEnabled && styles.cardDisabled]}>
+        <View style={[
+          styles.card,
+          { backgroundColor: C.bgCard, borderColor: C.border },
+          !notificationsEnabled && styles.cardDisabled,
+        ]}>
           <SettingRow
             icon="newspaper-outline"
             label="Post Notifications"
@@ -126,7 +147,7 @@ export default function SettingsScreen() {
             value={postNotifications && notificationsEnabled}
             onToggle={() => toggleNotifications('postNotifications')}
           />
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: C.border }]} />
           <SettingRow
             icon="chatbubble-outline"
             label="Comment Notifications"
@@ -134,118 +155,94 @@ export default function SettingsScreen() {
             value={commentNotifications && notificationsEnabled}
             onToggle={() => toggleNotifications('commentNotifications')}
           />
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: C.border }]} />
           <SettingRow
             icon="person-add-outline"
             label="Follow Notifications"
             sublabel="When someone follows you"
             value={followNotifications && notificationsEnabled}
             onToggle={() => toggleNotifications('followNotifications')}
-            color={Colors.success}
+            color={C.success}
           />
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: C.border }]} />
           <SettingRow
             icon="mail-outline"
             label="Message Notifications"
             sublabel="When you receive a new message"
             value={messageNotifications && notificationsEnabled}
             onToggle={() => toggleNotifications('messageNotifications')}
-            color={Colors.warning}
+            color={C.warning}
           />
         </View>
 
-        {/* Account */}
+        {/* ── Account ── */}
         <SectionHeader title="ACCOUNT" />
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: C.bgCard, borderColor: C.border }]}>
           {[
-            { icon: 'lock-closed-outline' as const, label: 'Change Password', color: Colors.purple },
-            { icon: 'shield-outline' as const, label: 'Privacy', color: Colors.cyan },
-            { icon: 'help-circle-outline' as const, label: 'Help & Support', color: Colors.success },
-            { icon: 'information-circle-outline' as const, label: 'About LinkerX', color: Colors.textMuted },
+            { icon: 'lock-closed-outline' as const, label: 'Change Password', color: C.purple },
+            { icon: 'shield-outline'       as const, label: 'Privacy',         color: C.cyan },
+            { icon: 'help-circle-outline'  as const, label: 'Help & Support',  color: C.success },
+            { icon: 'information-circle-outline' as const, label: 'About LinkerX', color: C.textMuted },
           ].map((item, i, arr) => (
             <React.Fragment key={item.label}>
               <TouchableOpacity style={styles.row}>
                 <View style={[styles.rowIcon, { backgroundColor: item.color + '22' }]}>
                   <Ionicons name={item.icon} size={18} color={item.color} />
                 </View>
-                <Text style={[styles.rowLabel, { flex: 1 }]}>{item.label}</Text>
-                <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+                <Text style={[styles.rowLabel, { flex: 1, color: C.textPrimary }]}>{item.label}</Text>
+                <Ionicons name="chevron-forward" size={16} color={C.textMuted} />
               </TouchableOpacity>
-              {i < arr.length - 1 && <View style={styles.divider} />}
+              {i < arr.length - 1 && <View style={[styles.divider, { backgroundColor: C.border }]} />}
             </React.Fragment>
           ))}
         </View>
 
-        <Text style={styles.version}>LinkerX v1.0.0</Text>
+        <Text style={[styles.version, { color: C.textMuted }]}>LinkerX v1.0.0</Text>
       </ScrollView>
     </View>
   );
 }
 
+// Static layout-only styles — colors are applied inline via useColors()
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
+  container:   { flex: 1 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 16,
-    backgroundColor: Colors.bgCard,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingTop: 56, paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   backBtn: {
     width: 38, height: 38, borderRadius: 10,
-    backgroundColor: Colors.bgElevated,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '700' },
-  content: { padding: 16, paddingBottom: 40 },
+  headerTitle: { fontSize: 18, fontWeight: '700' },
+  content:     { padding: 16, paddingBottom: 40 },
   sectionHeader: {
-    color: Colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginBottom: 8,
-    marginTop: 16,
-    marginLeft: 4,
+    fontSize: 11, fontWeight: '700', letterSpacing: 1.2,
+    marginBottom: 8, marginTop: 16, marginLeft: 4,
   },
   card: {
-    backgroundColor: Colors.bgCard,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 14,
-    marginBottom: 4,
+    borderRadius: 16, borderWidth: 1,
+    padding: 14, marginBottom: 4,
   },
   cardDisabled: { opacity: 0.5 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 6,
-  },
-  rowIcon: {
-    width: 36, height: 36, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
+  rowIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   rowText: { flex: 1 },
-  rowLabel: { color: Colors.textPrimary, fontSize: 14, fontWeight: '500' },
-  rowSublabel: { color: Colors.textMuted, fontSize: 12, marginTop: 1 },
-  divider: { height: 1, backgroundColor: Colors.border, marginVertical: 6 },
-  themeRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  rowLabel:    { fontSize: 14, fontWeight: '500' },
+  rowSublabel: { fontSize: 12, marginTop: 1 },
+  divider:     { height: 1, marginVertical: 6 },
+  themeRow:    { flexDirection: 'row', gap: 10, marginTop: 12 },
   themeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 12, borderRadius: 12,
-    backgroundColor: Colors.bgElevated, borderWidth: 1, borderColor: Colors.border,
+    gap: 8, paddingVertical: 12, borderRadius: 12, borderWidth: 1,
+    overflow: 'hidden',
   },
-  themeBtnActive: { borderColor: Colors.purple },
   themeBtnGradient: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 12, borderRadius: 10,
   },
-  themeLabel: { color: Colors.textMuted, fontSize: 14, fontWeight: '600' },
-  themeLabelActive: { color: Colors.white, fontSize: 14, fontWeight: '600' },
-  version: { color: Colors.textMuted, fontSize: 12, textAlign: 'center', marginTop: 24 },
+  themeLabel:      { fontSize: 14, fontWeight: '600' },
+  themeLabelActive:{ fontSize: 14, fontWeight: '600' },
+  version: { fontSize: 12, textAlign: 'center', marginTop: 24 },
 });

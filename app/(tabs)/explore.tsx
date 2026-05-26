@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
+import { useColors } from '@/hooks/useColors';
 import Avatar from '@/components/Avatar';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/lib/toast';
@@ -23,6 +24,7 @@ type UserResult = {
 
 export default function ExploreScreen() {
   const { user } = useAuthStore();
+  const C = useColors();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UserResult[]>([]);
   const [suggested, setSuggested] = useState<UserResult[]>([]);
@@ -78,71 +80,28 @@ export default function ExploreScreen() {
     }
   };
 
-  const displayList = query.length >= 2 ? results : suggested;
-  const isSearching = query.length >= 2;
-
-  const renderUser = ({ item }: { item: UserResult }) => {
-    const isFollowing = followingIds.has(item._id);
-    const isMe = item._id === user?._id;
-
-    return (
-      <TouchableOpacity
-        style={styles.userRow}
-        onPress={() => router.push(`/user/${item._id}`)}
-        activeOpacity={0.8}
-      >
-        <Avatar uri={item.avatar} name={item.userName} size={50} />
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>{item.userName}</Text>
-          {item.bio ? <Text style={styles.bio} numberOfLines={1}>{item.bio}</Text> : null}
-          <Text style={styles.followers}>
-            <Ionicons name="people-outline" size={11} color={Colors.cyan} /> {item.followersCount} followers
-          </Text>
-        </View>
-        {!isMe && (
-          <TouchableOpacity
-            onPress={() => handleFollow(item._id)}
-            activeOpacity={0.8}
-          >
-            {isFollowing ? (
-              <View style={styles.followingBtn}>
-                <Text style={styles.followingText}>Following</Text>
-              </View>
-            ) : (
-              <LinearGradient
-                colors={[Colors.purple, Colors.cyan]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.followBtn}
-              >
-                <Text style={styles.followText}>Follow</Text>
-              </LinearGradient>
-            )}
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-    );
-  };
+  const isSearching = query.trim().length >= 2;
+  const displayList = isSearching ? results : suggested;
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
+    <View style={[styles.container, { backgroundColor: C.bg }]}>
       <View style={styles.headerArea}>
-        <Text style={styles.title}>Explore</Text>
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={18} color={Colors.textMuted} />
+        <Text style={[styles.title, { color: C.textPrimary }]}>Explore</Text>
+        <View style={[styles.searchBar, { backgroundColor: C.bgCard, borderColor: C.border }]}>
+          <Ionicons name="search-outline" size={18} color={C.textMuted} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: C.textPrimary }]}
             placeholder="Search people..."
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={C.textMuted}
             value={query}
             onChangeText={handleSearch}
             autoCapitalize="none"
           />
           {loading
-            ? <ActivityIndicator size="small" color={Colors.purple} />
+            ? <ActivityIndicator size="small" color={C.purple} />
             : query.length > 0
               ? <TouchableOpacity onPress={() => { setQuery(''); setResults([]); }}>
-                  <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+                  <Ionicons name="close-circle" size={18} color={C.textMuted} />
                 </TouchableOpacity>
               : null
           }
@@ -152,39 +111,53 @@ export default function ExploreScreen() {
       <FlatList
         data={displayList}
         keyExtractor={(item) => item._id}
-        renderItem={renderUser}
+        renderItem={({ item }) => {
+          const isFollowing = followingIds.has(item._id);
+          const isMe = item._id === user?._id;
+          return (
+            <TouchableOpacity style={[styles.userRow, { backgroundColor: C.bgCard, borderColor: C.border }]}
+              onPress={() => router.push(`/user/${item._id}`)} activeOpacity={0.8}>
+              <Avatar uri={item.avatar} name={item.userName} size={50} />
+              <View style={styles.userInfo}>
+                <Text style={[styles.userName, { color: C.textPrimary }]}>{item.userName}</Text>
+                {item.bio ? <Text style={[styles.bio, { color: C.textMuted }]} numberOfLines={1}>{item.bio}</Text> : null}
+                <Text style={[styles.followers, { color: C.cyan }]}>
+                  <Ionicons name="people-outline" size={11} color={C.cyan} /> {item.followersCount} followers
+                </Text>
+              </View>
+              {!isMe && (
+                <TouchableOpacity onPress={() => handleFollow(item._id)} activeOpacity={0.8}>
+                  {isFollowing ? (
+                    <View style={[styles.followingBtn, { borderColor: C.border, backgroundColor: C.bgElevated }]}>
+                      <Text style={[styles.followingText, { color: C.textMuted }]}>Following</Text>
+                    </View>
+                  ) : (
+                    <LinearGradient colors={[C.purple, C.cyan]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.followBtn}>
+                      <Text style={[styles.followText, { color: C.white }]}>Follow</Text>
+                    </LinearGradient>
+                  )}
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+          );
+        }}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          !isSearching ? (
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => { setRefreshing(true); fetchSuggested(); }}
-              tintColor={Colors.purple}
-            />
-          ) : undefined
-        }
+        refreshControl={!isSearching ? (
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchSuggested(); }} tintColor={C.purple} />
+        ) : undefined}
         ListHeaderComponent={
-          !isSearching ? (
-            <Text style={styles.sectionLabel}>SUGGESTED PEOPLE</Text>
-          ) : results.length > 0 ? (
-            <Text style={styles.sectionLabel}>SEARCH RESULTS</Text>
-          ) : null
+          !isSearching ? <Text style={[styles.sectionLabel, { color: C.textMuted }]}>SUGGESTED PEOPLE</Text>
+          : results.length > 0 ? <Text style={[styles.sectionLabel, { color: C.textMuted }]}>SEARCH RESULTS</Text>
+          : null
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            {isSearching ? (
-              <>
-                <Ionicons name="person-outline" size={44} color={Colors.textMuted} />
-                <Text style={styles.emptyText}>No users found for "{query}"</Text>
-              </>
-            ) : (
-              <>
-                <Ionicons name="people-outline" size={44} color={Colors.textMuted} />
-                <Text style={styles.emptyText}>No suggestions yet</Text>
-                <Text style={styles.emptySubText}>Search for people to connect with</Text>
-              </>
-            )}
+            <Ionicons name={isSearching ? 'person-outline' : 'people-outline'} size={44} color={C.textMuted} />
+            <Text style={[styles.emptyText, { color: C.textMuted }]}>
+              {isSearching ? `No users found for "${query}"` : 'No suggestions yet'}
+            </Text>
+            {!isSearching && <Text style={[styles.emptySubText, { color: C.textMuted }]}>Search for people to connect with</Text>}
           </View>
         }
       />

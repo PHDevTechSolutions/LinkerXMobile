@@ -103,6 +103,20 @@ router.post("/:id/follow", async (req, res) => {
     } else {
       await users.updateOne({ _id: new ObjectId(myId) }, { $push: { following: targetId }, $inc: { followingCount: 1 } });
       await users.updateOne({ _id: new ObjectId(targetId) }, { $push: { followers: myId }, $inc: { followersCount: 1 } });
+
+      // Emit follow notification via socket
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`user_${targetId}`).emit('notification', {
+          type: 'follow',
+          title: me.userName || 'Someone',
+          body: `${me.userName} started following you`,
+          fromUserId: myId,
+          fromUserName: me.userName || '',
+          fromUserAvatar: me.avatar || null,
+          targetId: myId,
+        });
+      }
     }
 
     return res.status(200).json({ following: !isFollowing });

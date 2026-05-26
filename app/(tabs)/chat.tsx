@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { Colors } from '@/constants/Colors';
+import { useColors } from '@/hooks/useColors';
 import Avatar from '@/components/Avatar';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
@@ -33,6 +34,7 @@ type Tab = 'chats' | 'groups' | 'communities';
 
 export default function ChatScreen() {
   const { user } = useAuthStore();
+  const C = useColors();
   const [activeTab, setActiveTab] = useState<Tab>('chats');
   const [chats, setChats] = useState<DirectChat[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -70,28 +72,23 @@ export default function ChatScreen() {
     const other = getOtherUser(item);
     if (!other) return null;
     return (
-      <TouchableOpacity
-        style={styles.chatRow}
-        onPress={() => router.push(`/chat/${item._id}`)}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={[styles.chatRow, { backgroundColor: C.bgCard, borderColor: C.border }]}
+        onPress={() => router.push(`/chat/${item._id}`)} activeOpacity={0.8}>
         <View style={styles.avatarWrap}>
           <Avatar uri={other.avatar} name={other.userName} size={50} />
-          <View style={styles.onlineDot} />
+          <View style={[styles.onlineDot, { backgroundColor: C.success, borderColor: C.bgCard }]} />
         </View>
         <View style={styles.chatInfo}>
-          <Text style={styles.chatName}>{other.userName}</Text>
-          <Text style={styles.lastMsg} numberOfLines={1}>
+          <Text style={[styles.chatName, { color: C.textPrimary }]}>{other.userName}</Text>
+          <Text style={[styles.lastMsg, { color: C.textMuted }]} numberOfLines={1}>
             {item.lastMessage?.text || 'Start a conversation'}
           </Text>
         </View>
         <View style={styles.chatMeta}>
-          {item.lastMessage && (
-            <Text style={styles.chatTime}>{formatTime(item.lastMessage.createdAt)}</Text>
-          )}
+          {item.lastMessage && <Text style={[styles.chatTime, { color: C.textMuted }]}>{formatTime(item.lastMessage.createdAt)}</Text>}
           {item.unreadCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{item.unreadCount}</Text>
+            <View style={[styles.badge, { backgroundColor: C.purple }]}>
+              <Text style={[styles.badgeText, { color: C.white }]}>{item.unreadCount}</Text>
             </View>
           )}
         </View>
@@ -102,92 +99,75 @@ export default function ChatScreen() {
   const renderGroup = ({ item }: { item: Group }) => {
     const isAdmin = item.adminIds.includes(user?._id || '');
     return (
-      <TouchableOpacity
-        style={styles.chatRow}
-        onPress={() => router.push(`/group/${item._id}` as any)}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={[styles.chatRow, { backgroundColor: C.bgCard, borderColor: C.border }]}
+        onPress={() => router.push(`/group/${item._id}` as any)} activeOpacity={0.8}>
         <View style={styles.groupAvatarWrap}>
           {item.avatar ? (
             <Avatar uri={item.avatar} name={item.name} size={50} />
           ) : (
-            <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.groupAvatarGradient}>
-              <Ionicons
-                name={item.type === 'community' ? 'globe' : 'people'}
-                size={22} color={Colors.white}
-              />
+            <LinearGradient colors={[C.purple, C.cyan]} style={styles.groupAvatarGradient}>
+              <Ionicons name={item.type === 'community' ? 'globe' : 'people'} size={22} color={C.white} />
             </LinearGradient>
           )}
         </View>
         <View style={styles.chatInfo}>
           <View style={styles.groupNameRow}>
-            <Text style={styles.chatName}>{item.name}</Text>
+            <Text style={[styles.chatName, { color: C.textPrimary }]}>{item.name}</Text>
             {isAdmin && (
-              <View style={styles.adminBadge}>
-                <Text style={styles.adminBadgeText}>Admin</Text>
+              <View style={[styles.adminBadge, { backgroundColor: C.purple + '33' }]}>
+                <Text style={[styles.adminBadgeText, { color: C.purpleLight }]}>Admin</Text>
               </View>
             )}
           </View>
-          <Text style={styles.lastMsg} numberOfLines={1}>
-            {item.lastMessage
-              ? `${item.lastMessage.senderName}: ${item.lastMessage.text}`
-              : `${item.memberIds.length} members`
-            }
+          <Text style={[styles.lastMsg, { color: C.textMuted }]} numberOfLines={1}>
+            {item.lastMessage ? `${item.lastMessage.senderName}: ${item.lastMessage.text}` : `${item.memberIds.length} members`}
           </Text>
         </View>
         <View style={styles.chatMeta}>
-          {item.lastMessage && (
-            <Text style={styles.chatTime}>{formatTime(item.lastMessage.createdAt)}</Text>
-          )}
-          <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} />
+          {item.lastMessage && <Text style={[styles.chatTime, { color: C.textMuted }]}>{formatTime(item.lastMessage.createdAt)}</Text>}
+          <Ionicons name="chevron-forward" size={14} color={C.textMuted} />
         </View>
       </TouchableOpacity>
     );
   };
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator color={Colors.purple} size="large" /></View>;
+    return <View style={[styles.center, { backgroundColor: C.bg }]}><ActivityIndicator color={C.purple} size="large" /></View>;
   }
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
+    <View style={[styles.container, { backgroundColor: C.bg }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Messages</Text>
+        <Text style={[styles.title, { color: C.textPrimary }]}>Messages</Text>
         <TouchableOpacity
           style={styles.newBtn}
           onPress={() => router.push(
             activeTab === 'chats' ? '/new-chat' : (`/new-group?type=${activeTab === 'groups' ? 'group' : 'community'}` as any)
           )}
         >
-          <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.newBtnGradient}>
-            <Ionicons name="add" size={20} color={Colors.white} />
+          <LinearGradient colors={[C.purple, C.cyan]} style={styles.newBtnGradient}>
+            <Ionicons name="add" size={20} color={C.white} />
           </LinearGradient>
         </TouchableOpacity>
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { backgroundColor: C.bgCard, borderColor: C.border }]}>
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+            style={[styles.tab, activeTab === tab.key && { backgroundColor: C.purpleDim }]}
             onPress={() => setActiveTab(tab.key)}
           >
-            <Ionicons
-              name={tab.icon}
-              size={16}
-              color={activeTab === tab.key ? Colors.purple : Colors.textMuted}
-            />
-            <Text style={[styles.tabLabel, activeTab === tab.key && styles.tabLabelActive]}>
+            <Ionicons name={tab.icon} size={16} color={activeTab === tab.key ? C.purple : C.textMuted} />
+            <Text style={[styles.tabLabel, { color: activeTab === tab.key ? C.purple : C.textMuted },
+              activeTab === tab.key && { fontWeight: '700' }]}>
               {tab.label}
             </Text>
-            {activeTab === tab.key && <View style={styles.tabIndicator} />}
+            {activeTab === tab.key && <View style={[styles.tabIndicator, { backgroundColor: C.purple }]} />}
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Content */}
       {activeTab === 'chats' ? (
         <FlatList
           data={chats}
@@ -195,14 +175,12 @@ export default function ChatScreen() {
           renderItem={renderDirectChat}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor={Colors.purple} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor={C.purple} />}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="chatbubbles-outline" size={48} color={Colors.textMuted} />
-              <Text style={styles.emptyTitle}>No conversations yet</Text>
-              <Text style={styles.emptySubText}>Tap + to start a new chat</Text>
+              <Ionicons name="chatbubbles-outline" size={48} color={C.textMuted} />
+              <Text style={[styles.emptyTitle, { color: C.textPrimary }]}>No conversations yet</Text>
+              <Text style={[styles.emptySubText, { color: C.textMuted }]}>Tap + to start a new chat</Text>
             </View>
           }
         />
@@ -213,19 +191,12 @@ export default function ChatScreen() {
           renderItem={renderGroup}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor={Colors.purple} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll(); }} tintColor={C.purple} />}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons
-                name={activeTab === 'groups' ? 'people-outline' : 'globe-outline'}
-                size={48} color={Colors.textMuted}
-              />
-              <Text style={styles.emptyTitle}>
-                No {activeTab === 'groups' ? 'groups' : 'communities'} yet
-              </Text>
-              <Text style={styles.emptySubText}>Tap + to create one</Text>
+              <Ionicons name={activeTab === 'groups' ? 'people-outline' : 'globe-outline'} size={48} color={C.textMuted} />
+              <Text style={[styles.emptyTitle, { color: C.textPrimary }]}>No {activeTab === 'groups' ? 'groups' : 'communities'} yet</Text>
+              <Text style={[styles.emptySubText, { color: C.textMuted }]}>Tap + to create one</Text>
             </View>
           }
         />

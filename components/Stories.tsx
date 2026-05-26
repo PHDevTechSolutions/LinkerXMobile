@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
+import { useColors } from '@/hooks/useColors';
 import Avatar from './Avatar';
 import { useAuthStore } from '@/store/authStore';
 import { uploadImageFromWeb, uploadImage } from '@/lib/cloudinary';
@@ -38,6 +39,7 @@ type Props = {
 
 export default function Stories({ onRefresh }: Props) {
   const { user } = useAuthStore();
+  const C = useColors();
   const [groups, setGroups] = useState<StoryGroup[]>([]);
   const [viewing, setViewing] = useState<{ group: StoryGroup; index: number } | null>(null);
   const [creating, setCreating] = useState(false);
@@ -150,30 +152,27 @@ export default function Stories({ onRefresh }: Props) {
   };
 
   const BG_COLORS = ['#7C3AED', '#06B6D4', '#10B981', '#EF4444', '#F59E0B', '#EC4899', '#1E1E3A'];
-
   const currentStory = viewing ? viewing.group.stories[viewing.index] : null;
 
   return (
     <>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.container} contentContainerStyle={styles.scroll}>
-        {/* Add story button */}
         <TouchableOpacity style={styles.addStoryBtn} onPress={() => setCreating(true)}>
           <View style={styles.addStoryAvatar}>
             <Avatar uri={user?.avatar} name={user?.userName} size={56} />
-            <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.addBadge}>
-              <Ionicons name="add" size={14} color={Colors.white} />
+            <LinearGradient colors={[C.purple, C.cyan]} style={[styles.addBadge, { borderColor: C.bg }]}>
+              <Ionicons name="add" size={14} color={C.white} />
             </LinearGradient>
           </View>
-          <Text style={styles.storyLabel} numberOfLines={1}>Your Story</Text>
+          <Text style={[styles.storyLabel, { color: C.textMuted }]} numberOfLines={1}>Your Story</Text>
         </TouchableOpacity>
 
-        {/* Story groups */}
         {groups.map((group) => (
           <TouchableOpacity key={group.author._id} style={styles.storyBtn} onPress={() => viewStory(group)}>
-            <View style={[styles.storyRing, group.hasUnviewed ? styles.storyRingActive : styles.storyRingViewed]}>
+            <View style={[styles.storyRing, { borderColor: group.hasUnviewed ? C.purple : C.textMuted }]}>
               <Avatar uri={group.author.avatar} name={group.author.userName} size={52} />
             </View>
-            <Text style={styles.storyLabel} numberOfLines={1}>{group.author.userName}</Text>
+            <Text style={[styles.storyLabel, { color: C.textMuted }]} numberOfLines={1}>{group.author.userName}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -182,43 +181,31 @@ export default function Stories({ onRefresh }: Props) {
       <Modal visible={!!viewing} animationType="fade" onRequestClose={() => setViewing(null)}>
         {currentStory && (
           <View style={styles.viewer}>
-            {/* Progress bars */}
             <View style={styles.progressBars}>
               {viewing!.group.stories.map((_, i) => (
-                <View key={i} style={styles.progressBarBg}>
-                  <View style={[
-                    styles.progressBarFill,
+                <View key={i} style={[styles.progressBarBg, { backgroundColor: 'rgba(255,255,255,0.4)' }]}>
+                  <View style={[styles.progressBarFill, { backgroundColor: C.white },
                     i < viewing!.index ? { width: '100%' } :
-                    i === viewing!.index ? { width: `${progress}%` } :
-                    { width: '0%' }
+                    i === viewing!.index ? { width: `${progress}%` } : { width: '0%' }
                   ]} />
                 </View>
               ))}
             </View>
-
-            {/* Story content */}
-            {currentStory.mediaUrl ? (
-              <Image source={{ uri: currentStory.mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: currentStory.backgroundColor, alignItems: 'center', justifyContent: 'center' }]}>
-                <Text style={styles.storyText}>{currentStory.text}</Text>
-              </View>
-            )}
-
-            {/* Overlay gradient */}
+            {currentStory.mediaUrl
+              ? <Image source={{ uri: currentStory.mediaUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              : <View style={[StyleSheet.absoluteFill, { backgroundColor: currentStory.backgroundColor, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Text style={styles.storyText}>{currentStory.text}</Text>
+                </View>
+            }
             <LinearGradient colors={['rgba(0,0,0,0.5)', 'transparent', 'transparent', 'rgba(0,0,0,0.3)']} style={StyleSheet.absoluteFill} />
-
-            {/* Header */}
             <View style={styles.viewerHeader}>
               <Avatar uri={viewing!.group.author.avatar} name={viewing!.group.author.userName} size={36} />
               <Text style={styles.viewerName}>{viewing!.group.author.userName}</Text>
               <Text style={styles.viewerTime}>{formatTimeAgo(currentStory.createdAt)}</Text>
               <TouchableOpacity onPress={() => setViewing(null)} style={styles.closeBtn}>
-                <Ionicons name="close" size={24} color={Colors.white} />
+                <Ionicons name="close" size={24} color={C.white} />
               </TouchableOpacity>
             </View>
-
-            {/* Tap areas */}
             <View style={styles.tapAreas}>
               <TouchableOpacity style={styles.tapLeft} onPress={prevStory} />
               <TouchableOpacity style={styles.tapRight} onPress={nextStory} />
@@ -229,61 +216,42 @@ export default function Stories({ onRefresh }: Props) {
 
       {/* Create story modal */}
       <Modal visible={creating} animationType="slide" onRequestClose={() => setCreating(false)}>
-        <View style={styles.createContainer}>
-          <View style={styles.createHeader}>
-            <TouchableOpacity onPress={() => setCreating(false)} style={styles.closeBtn2}>
-              <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+        <View style={[styles.createContainer, { backgroundColor: C.bg }]}>
+          <View style={[styles.createHeader, { backgroundColor: C.bgCard, borderBottomColor: C.border }]}>
+            <TouchableOpacity onPress={() => setCreating(false)} style={[styles.closeBtn2, { backgroundColor: C.bgElevated }]}>
+              <Ionicons name="arrow-back" size={22} color={C.textPrimary} />
             </TouchableOpacity>
-            <Text style={styles.createTitle}>Create Story</Text>
+            <Text style={[styles.createTitle, { color: C.textPrimary }]}>Create Story</Text>
             <View style={{ width: 38 }} />
           </View>
 
           <View style={styles.createBody}>
-            {/* Photo option */}
-            <TouchableOpacity style={styles.createOption} onPress={pickAndCreateStory} disabled={uploading}>
-              <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.createOptionIcon}>
-                {uploading ? <ActivityIndicator color={Colors.white} /> : <Ionicons name="image" size={28} color={Colors.white} />}
+            <TouchableOpacity style={[styles.createOption, { backgroundColor: C.bgCard, borderColor: C.border }]}
+              onPress={pickAndCreateStory} disabled={uploading}>
+              <LinearGradient colors={[C.purple, C.cyan]} style={styles.createOptionIcon}>
+                {uploading ? <ActivityIndicator color={C.white} /> : <Ionicons name="image" size={28} color={C.white} />}
               </LinearGradient>
-              <Text style={styles.createOptionLabel}>Photo Story</Text>
-              <Text style={styles.createOptionSub}>Share a photo for 24 hours</Text>
+              <Text style={[styles.createOptionLabel, { color: C.textPrimary }]}>Photo Story</Text>
+              <Text style={[styles.createOptionSub, { color: C.textMuted }]}>Share a photo for 24 hours</Text>
             </TouchableOpacity>
 
-            {/* Text option */}
             <View style={styles.textStorySection}>
-              <Text style={styles.textStoryLabel}>Text Story</Text>
+              <Text style={[styles.textStoryLabel, { color: C.textPrimary }]}>Text Story</Text>
               <View style={[styles.textPreview, { backgroundColor: bgColor }]}>
-                <TextInput
-                  style={styles.textStoryInput}
-                  placeholder="Write something..."
-                  placeholderTextColor="rgba(255,255,255,0.6)"
-                  value={storyText}
-                  onChangeText={setStoryText}
-                  multiline
-                  maxLength={150}
-                  textAlign="center"
-                />
+                <TextInput style={styles.textStoryInput} placeholder="Write something..."
+                  placeholderTextColor="rgba(255,255,255,0.6)" value={storyText}
+                  onChangeText={setStoryText} multiline maxLength={150} textAlign="center" />
               </View>
-
-              {/* Color picker */}
               <View style={styles.colorPicker}>
                 {BG_COLORS.map((c) => (
-                  <TouchableOpacity
-                    key={c}
-                    style={[styles.colorDot, { backgroundColor: c }, bgColor === c && styles.colorDotSelected]}
-                    onPress={() => setBgColor(c)}
-                  />
+                  <TouchableOpacity key={c} style={[styles.colorDot, { backgroundColor: c },
+                    bgColor === c && { borderWidth: 3, borderColor: C.white }]}
+                    onPress={() => setBgColor(c)} />
                 ))}
               </View>
-
-              <TouchableOpacity
-                style={[styles.postStoryBtn, !storyText.trim() && { opacity: 0.5 }]}
-                onPress={postTextStory}
-                disabled={!storyText.trim() || posting}
-              >
-                {posting
-                  ? <ActivityIndicator color={Colors.white} />
-                  : <Text style={styles.postStoryBtnText}>Post Story</Text>
-                }
+              <TouchableOpacity style={[styles.postStoryBtn, { backgroundColor: C.purple }, !storyText.trim() && { opacity: 0.5 }]}
+                onPress={postTextStory} disabled={!storyText.trim() || posting}>
+                {posting ? <ActivityIndicator color={C.white} /> : <Text style={[styles.postStoryBtnText, { color: C.white }]}>Post Story</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -301,73 +269,41 @@ function formatTimeAgo(dateStr: string): string {
 }
 
 const styles = StyleSheet.create({
-  container: { marginBottom: 8 },
-  scroll: { paddingHorizontal: 16, gap: 12 },
-  addStoryBtn: { alignItems: 'center', gap: 6, width: 68 },
+  container:    { marginBottom: 8 },
+  scroll:       { paddingHorizontal: 16, gap: 12 },
+  addStoryBtn:  { alignItems: 'center', gap: 6, width: 68 },
   addStoryAvatar: { position: 'relative' },
-  addBadge: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 22, height: 22, borderRadius: 11,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: Colors.bg,
-  },
-  storyBtn: { alignItems: 'center', gap: 6, width: 68 },
-  storyRing: { padding: 2, borderRadius: 32, borderWidth: 2 },
-  storyRingActive: { borderColor: Colors.purple },
-  storyRingViewed: { borderColor: Colors.textMuted },
-  storyLabel: { color: Colors.textMuted, fontSize: 11, textAlign: 'center', width: 64 },
-
-  // Viewer
-  viewer: { flex: 1, backgroundColor: '#000' },
-  progressBars: {
-    position: 'absolute', top: 52, left: 8, right: 8,
-    flexDirection: 'row', gap: 3, zIndex: 10,
-  },
-  progressBarBg: { flex: 1, height: 2, backgroundColor: 'rgba(255,255,255,0.4)', borderRadius: 1 },
-  progressBarFill: { height: '100%', backgroundColor: Colors.white, borderRadius: 1 },
-  viewerHeader: {
-    position: 'absolute', top: 62, left: 12, right: 12,
-    flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10,
-  },
-  viewerName: { flex: 1, color: Colors.white, fontWeight: '700', fontSize: 14 },
-  viewerTime: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
-  closeBtn: { padding: 4 },
-  storyText: { color: Colors.white, fontSize: 24, fontWeight: '700', textAlign: 'center', padding: 24 },
-  tapAreas: { ...StyleSheet.absoluteFillObject, flexDirection: 'row', top: 100 },
-  tapLeft: { flex: 1 },
-  tapRight: { flex: 1 },
-
-  // Create
-  createContainer: { flex: 1, backgroundColor: Colors.bg },
-  createHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 56, paddingBottom: 16,
-    backgroundColor: Colors.bgCard, borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  closeBtn2: { width: 38, height: 38, borderRadius: 10, backgroundColor: Colors.bgElevated, alignItems: 'center', justifyContent: 'center' },
-  createTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '700' },
-  createBody: { padding: 20, gap: 24 },
-  createOption: {
-    backgroundColor: Colors.bgCard, borderRadius: 16,
-    padding: 20, alignItems: 'center', gap: 10,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  createOptionIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  createOptionLabel: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },
-  createOptionSub: { color: Colors.textMuted, fontSize: 13 },
-  textStorySection: { gap: 12 },
-  textStoryLabel: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700' },
-  textPreview: {
-    borderRadius: 16, height: 160,
-    alignItems: 'center', justifyContent: 'center', padding: 16,
-  },
-  textStoryInput: { color: Colors.white, fontSize: 20, fontWeight: '600', textAlign: 'center', width: '100%' },
-  colorPicker: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
-  colorDot: { width: 32, height: 32, borderRadius: 16 },
-  colorDotSelected: { borderWidth: 3, borderColor: Colors.white },
-  postStoryBtn: {
-    backgroundColor: Colors.purple, borderRadius: 12,
-    height: 48, alignItems: 'center', justifyContent: 'center',
-  },
-  postStoryBtnText: { color: Colors.white, fontWeight: '700', fontSize: 15 },
+  addBadge:     { position: 'absolute', bottom: 0, right: 0, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+  storyBtn:     { alignItems: 'center', gap: 6, width: 68 },
+  storyRing:    { padding: 2, borderRadius: 32, borderWidth: 2 },
+  storyLabel:   { fontSize: 11, textAlign: 'center', width: 64 },
+  viewer:       { flex: 1, backgroundColor: '#000' },
+  progressBars: { position: 'absolute', top: 52, left: 8, right: 8, flexDirection: 'row', gap: 3, zIndex: 10 },
+  progressBarBg:   { flex: 1, height: 2, borderRadius: 1 },
+  progressBarFill: { height: '100%', borderRadius: 1 },
+  viewerHeader: { position: 'absolute', top: 62, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 10 },
+  viewerName:   { flex: 1, color: '#fff', fontWeight: '700', fontSize: 14 },
+  viewerTime:   { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  closeBtn:     { padding: 4 },
+  storyText:    { color: '#fff', fontSize: 24, fontWeight: '700', textAlign: 'center', padding: 24 },
+  tapAreas:     { ...StyleSheet.absoluteFillObject, flexDirection: 'row', top: 100 },
+  tapLeft:      { flex: 1 },
+  tapRight:     { flex: 1 },
+  createContainer: { flex: 1 },
+  createHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 56, paddingBottom: 16, borderBottomWidth: 1 },
+  closeBtn2:    { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  createTitle:  { fontSize: 18, fontWeight: '700' },
+  createBody:   { padding: 20, gap: 24 },
+  createOption: { borderRadius: 16, padding: 20, alignItems: 'center', gap: 10, borderWidth: 1 },
+  createOptionIcon:  { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  createOptionLabel: { fontSize: 16, fontWeight: '700' },
+  createOptionSub:   { fontSize: 13 },
+  textStorySection:  { gap: 12 },
+  textStoryLabel:    { fontSize: 16, fontWeight: '700' },
+  textPreview:       { borderRadius: 16, height: 160, alignItems: 'center', justifyContent: 'center', padding: 16 },
+  textStoryInput:    { color: '#fff', fontSize: 20, fontWeight: '600', textAlign: 'center', width: '100%' },
+  colorPicker:       { flexDirection: 'row', gap: 10, justifyContent: 'center' },
+  colorDot:          { width: 32, height: 32, borderRadius: 16 },
+  postStoryBtn:      { borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center' },
+  postStoryBtnText:  { fontWeight: '700', fontSize: 15 },
 });

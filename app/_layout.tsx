@@ -4,11 +4,13 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '@/store/authStore';
 import { useCallStore } from '@/store/callStore';
-import { Colors } from '@/constants/Colors';
+import { useNotificationStore } from '@/store/notificationStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import Toast from '@/components/Toast';
 import IncomingCall from '@/components/IncomingCall';
 import { useToastStore } from '@/lib/toast';
 import { getSocket } from '@/lib/socket';
+import { useColors } from '@/hooks/useColors';
 
 function GlobalToast() {
   const { visible, message, type, hide } = useToastStore();
@@ -67,17 +69,23 @@ export default function RootLayout() {
   const loadAuth = useAuthStore((s) => s.loadAuth);
   const token    = useAuthStore((s) => s.token);
   const { setIncomingCall } = useCallStore();
+  const { addNotification, incrementUnreadMessages } = useNotificationStore();
+  const {
+    notificationsEnabled, messageNotifications,
+    followNotifications, commentNotifications,
+  } = useSettingsStore();
+  const theme = useSettingsStore((s) => s.theme);
+  const C     = useColors();
 
   useEffect(() => { loadAuth(); }, []);
 
-  // Listen for incoming calls globally and store them (including the offer)
+  // Listen for incoming calls + all notifications globally
   useEffect(() => {
     if (!token) return;
     const socket = getSocket(token);
 
     const onIncomingCall = (data: any) => {
       console.log('📞 Incoming call received:', data);
-      // data must include: callId, callerId, callerName, callerAvatar, callType, offer
       if (!data?.offer) {
         console.warn('⚠️ webrtc_incoming_call missing offer — ignoring');
         return;
@@ -85,10 +93,30 @@ export default function RootLayout() {
       setIncomingCall(data);
     };
 
+    const onNotification = (data: any) => {
+      if (!notificationsEnabled) return;
+      if (data.type === 'message' && !messageNotifications) return;
+      if (data.type === 'follow'  && !followNotifications)  return;
+      if (data.type === 'comment' && !commentNotifications) return;
+
+      addNotification({
+        type: data.type,
+        title: data.title,
+        body: data.body,
+        fromUserId: data.fromUserId,
+        fromUserName: data.fromUserName,
+        fromUserAvatar: data.fromUserAvatar,
+        targetId: data.targetId,
+      });
+
+      if (data.type === 'message') incrementUnreadMessages();
+    };
+
     const joinAndListen = () => {
       console.log('🔌 Socket connected, joining user room:', socket.id);
       socket.emit('join_user_room');
       socket.on('webrtc_incoming_call', onIncomingCall);
+      socket.on('notification', onNotification);
     };
 
     if (socket.connected) {
@@ -100,13 +128,14 @@ export default function RootLayout() {
     return () => {
       socket.off('connect', joinAndListen);
       socket.off('webrtc_incoming_call', onIncomingCall);
+      socket.off('notification', onNotification);
     };
-  }, [token]);
+  }, [token, notificationsEnabled, messageNotifications, followNotifications, commentNotifications]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: Colors.bg }}>
-      <StatusBar style="light" backgroundColor={Colors.bg} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.bg } }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: C.bg }}>
+      <StatusBar style={theme === 'light' ? 'dark' : 'light'} backgroundColor={C.bg} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" />
@@ -118,6 +147,10 @@ export default function RootLayout() {
         <Stack.Screen name="user/[id]" />
         <Stack.Screen name="post/[id]" options={{ presentation: 'modal' }} />
         <Stack.Screen name="chat/[id]" />
+        <Stack.Screen name="profile/saved" />
+        <Stack.Screen name="profile/links" />
+        <Stack.Screen name="profile/files" />
+        <Stack.Screen name="notifications" />
       </Stack>
       <GlobalToast />
       <GlobalIncomingCall />

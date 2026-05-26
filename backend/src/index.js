@@ -53,7 +53,7 @@ io.on("connection", (socket) => {
     socket.to(chatId).emit("typing", { userId });
   });
 
-  socket.on("send_message", async ({ chatId, text }) => {
+  socket.on("send_message", async ({ chatId, text, attachment }) => {
     try {
       const { ObjectId } = require("mongodb");
       const db = await connectToDatabase();
@@ -61,15 +61,44 @@ io.on("connection", (socket) => {
       const chat = await db.collection("chats").findOne({ _id: new ObjectId(chatId) });
       if (!chat || !chat.participantIds.includes(socket.userId)) return;
 
-      const message = { chatId, senderId: socket.userId, text, read: false, createdAt: new Date() };
-      const result  = await db.collection("messages").insertOne(message);
+      // attachment: { url, type: 'image'|'file', fileName? }
+      const message = {
+        chatId,
+        senderId: socket.userId,
+        text: text || '',
+        attachment: attachment || null,
+        read: false,
+        createdAt: new Date(),
+      };
+      const result = await db.collection("messages").insertOne(message);
+
+      // lastMessage preview
+      const preview = attachment
+        ? (attachment.type === 'image' ? '📷 Image' : `📎 ${attachment.fileName || 'File'}`)
+        : text;
 
       await db.collection("chats").updateOne(
         { _id: new ObjectId(chatId) },
-        { $set: { lastMessage: { text, createdAt: message.createdAt }, updatedAt: new Date() } }
+        { $set: { lastMessage: { text: preview, createdAt: message.createdAt }, updatedAt: new Date() } }
       );
 
-      io.to(chatId).emit("new_message", { ...message, _id: result.insertedId.toString() });
+      const savedMsg = { ...message, _id: result.insertedId.toString() };
+      io.to(chatId).emit("new_message", savedMsg);
+
+      // Notify the other participant (not the sender)
+      const sender = await db.collection("users").findOne({ _id: new ObjectId(socket.userId) });
+      const otherUserId = chat.participantIds.find((id) => id !== socket.userId);
+      if (otherUserId) {
+        io.to(`user_${otherUserId}`).emit("notification", {
+          type: "message",
+          title: sender?.userName || "New Message",
+          body: preview || "Sent you a message",
+          fromUserId: socket.userId,
+          fromUserName: sender?.userName || "",
+          fromUserAvatar: sender?.avatar || null,
+          targetId: chatId,
+        });
+      }
     } catch (err) {
       console.error("send_message error:", err);
     }
@@ -174,6 +203,9 @@ io.on("connection", (socket) => {
 // ─── Express ─────────────────────────────────────────────────────────────────
 app.use(cors({ origin: "*" }));
 app.use(express.json());
+
+// Make io accessible in route handlers via req.app.get('io')
+app.set('io', io);
 
 app.use("/api",          authRoutes);
 app.use("/api/posts",    postsRoutes);

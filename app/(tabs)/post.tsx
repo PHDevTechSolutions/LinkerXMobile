@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
+import { useColors } from '@/hooks/useColors';
 import { toast } from '@/lib/toast';
 import { uploadImage, uploadImageFromWeb } from '@/lib/cloudinary';
 import api from '@/lib/api';
@@ -15,6 +16,7 @@ import api from '@/lib/api';
 type PostType = 'text' | 'link' | 'image' | 'file';
 
 export default function PostScreen() {
+  const C = useColors();
   const [type, setType] = useState<PostType>('text');
   const [content, setContent] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
@@ -97,38 +99,34 @@ export default function PostScreen() {
   ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>Create Post</Text>
+    <ScrollView style={[styles.container, { backgroundColor: C.bg }]} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <Text style={[styles.title, { color: C.textPrimary }]}>Create Post</Text>
 
-      {/* Type selector */}
       <View style={styles.typeRow}>
         {typeButtons.map((btn) => (
-          <TouchableOpacity
-            key={btn.value}
-            style={[styles.typeBtn, type === btn.value && styles.typeBtnActive]}
-            onPress={() => setType(btn.value)}
-          >
+          <TouchableOpacity key={btn.value}
+            style={[styles.typeBtn, { backgroundColor: C.bgCard, borderColor: type === btn.value ? C.purple : C.border }]}
+            onPress={() => setType(btn.value)}>
             {type === btn.value ? (
-              <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.typeBtnGradient}>
-                <Ionicons name={btn.icon} size={16} color={Colors.white} />
-                <Text style={styles.typeLabelActive}>{btn.label}</Text>
+              <LinearGradient colors={[C.purple, C.cyan]} style={styles.typeBtnGradient}>
+                <Ionicons name={btn.icon} size={16} color={C.white} />
+                <Text style={[styles.typeLabelActive, { color: C.white }]}>{btn.label}</Text>
               </LinearGradient>
             ) : (
               <>
-                <Ionicons name={btn.icon} size={16} color={Colors.textMuted} />
-                <Text style={styles.typeLabel}>{btn.label}</Text>
+                <Ionicons name={btn.icon} size={16} color={C.textMuted} />
+                <Text style={[styles.typeLabel, { color: C.textMuted }]}>{btn.label}</Text>
               </>
             )}
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Content input */}
-      <View style={styles.inputCard}>
+      <View style={[styles.inputCard, { backgroundColor: C.bgCard, borderColor: C.border }]}>
         <TextInput
-          style={styles.textArea}
+          style={[styles.textArea, { color: C.textPrimary }]}
           placeholder="What's on your mind?"
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={C.textMuted}
           value={content}
           onChangeText={setContent}
           multiline
@@ -137,14 +135,13 @@ export default function PostScreen() {
         />
       </View>
 
-      {/* Link input */}
       {type === 'link' && (
-        <View style={styles.linkInput}>
-          <Ionicons name="link-outline" size={18} color={Colors.cyan} />
+        <View style={[styles.linkInput, { backgroundColor: C.bgCard, borderColor: C.cyanDim }]}>
+          <Ionicons name="link-outline" size={18} color={C.cyan} />
           <TextInput
-            style={styles.linkText}
+            style={[styles.linkText, { color: C.textPrimary }]}
             placeholder="Paste URL here..."
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={C.textMuted}
             value={linkUrl}
             onChangeText={setLinkUrl}
             autoCapitalize="none"
@@ -153,44 +150,36 @@ export default function PostScreen() {
         </View>
       )}
 
-      {/* Image picker */}
       {type === 'image' && (
-        <TouchableOpacity style={styles.imagePicker} onPress={pickImage} disabled={uploading}>
+        <TouchableOpacity style={[styles.imagePicker, { backgroundColor: C.bgCard, borderColor: C.purpleDim }]}
+          onPress={pickImage} disabled={uploading}>
           {image ? (
             <>
               <Image source={{ uri: image }} style={styles.previewImage} resizeMode="cover" />
               {uploading && (
                 <View style={styles.uploadOverlay}>
-                  <ActivityIndicator color={Colors.white} size="large" />
-                  <Text style={styles.uploadingText}>Uploading...</Text>
+                  <ActivityIndicator color={C.white} size="large" />
+                  <Text style={[styles.uploadingText, { color: C.white }]}>Uploading...</Text>
                 </View>
               )}
               {!uploading && imageUrl && (
                 <View style={styles.uploadDone}>
-                  <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
+                  <Ionicons name="checkmark-circle" size={24} color={C.success} />
                 </View>
               )}
             </>
           ) : (
             <>
-              <Ionicons name="cloud-upload-outline" size={32} color={Colors.purple} />
-              <Text style={styles.imagePickerText}>Tap to select image</Text>
+              <Ionicons name="cloud-upload-outline" size={32} color={C.purple} />
+              <Text style={[styles.imagePickerText, { color: C.textMuted }]}>Tap to select image</Text>
             </>
           )}
         </TouchableOpacity>
       )}
 
-      {/* Post button */}
       <TouchableOpacity onPress={handlePost} disabled={loading} activeOpacity={0.85}>
-        <LinearGradient
-          colors={[Colors.purple, Colors.gradientMid, Colors.cyan]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={styles.postBtn}
-        >
-          {loading
-            ? <ActivityIndicator color={Colors.white} />
-            : <Text style={styles.postBtnText}>Post Now</Text>
-          }
+        <LinearGradient colors={[C.purple, C.gradientMid, C.cyan]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.postBtn}>
+          {loading ? <ActivityIndicator color={C.white} /> : <Text style={[styles.postBtnText, { color: C.white }]}>Post Now</Text>}
         </LinearGradient>
       </TouchableOpacity>
     </ScrollView>

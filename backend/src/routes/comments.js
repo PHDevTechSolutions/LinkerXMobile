@@ -60,6 +60,23 @@ router.post("/", async (req, res) => {
       );
     }
 
+    // Notify post owner (if not commenting on own post)
+    const post = await db.collection("posts").findOne({ _id: new ObjectId(postId) });
+    if (post && post.author._id !== req.user.userId) {
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`user_${post.author._id}`).emit('notification', {
+          type: 'comment',
+          title: author.userName,
+          body: `${author.userName} commented: "${text.slice(0, 60)}${text.length > 60 ? '...' : ''}"`,
+          fromUserId: req.user.userId,
+          fromUserName: author.userName,
+          fromUserAvatar: author.avatar || null,
+          targetId: postId,
+        });
+      }
+    }
+
     return res.status(201).json({ comment: { ...comment, _id: result.insertedId.toString() } });
   } catch (err) {
     console.error("Add comment error:", err);

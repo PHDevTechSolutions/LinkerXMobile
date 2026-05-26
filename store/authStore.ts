@@ -6,6 +6,7 @@ export type User = {
   userName: string;
   email: string;
   avatar?: string;
+  coverPhoto?: string;
   bio?: string;
   followersCount: number;
   followingCount: number;

@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '@/constants/Colors';
+import { useColors } from '@/hooks/useColors';
 import Avatar from './Avatar';
 import api from '@/lib/api';
 import { toast } from '@/lib/toast';
@@ -39,6 +40,7 @@ type Props = {
   onShare: (postId: string) => void;
   onDelete?: (postId: string) => void;
   onEdit?: (postId: string, newContent: string) => void;
+  savedPostIds?: string[]; // optional list of saved post IDs from parent
 };
 
 const REACTIONS = [
@@ -50,10 +52,15 @@ const REACTIONS = [
   { key: 'angry', emoji: '😡', color: '#EF4444' },
 ];
 
-export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit }: Props) {
+export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit, savedPostIds }: Props) {
   const isLiked  = post.likes.includes(currentUserId);
   const isOwner  = post.author?._id === currentUserId;
   const timeAgo  = formatTimeAgo(post.createdAt);
+  const C        = useColors();
+
+  // Save state
+  const [isSaved, setIsSaved] = useState(() => savedPostIds?.includes(post._id) ?? false);
+  const [saving, setSaving]   = useState(false);
 
   // Reactions
   const [showReactions, setShowReactions]   = useState(false);
@@ -132,6 +139,20 @@ export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit
     } catch (_) {}
   };
 
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await api.post(`/api/profile/saved/${post._id}`);
+      setIsSaved((prev) => !prev);
+      toast.success(isSaved ? 'Removed from saved.' : 'Post saved!');
+    } catch {
+      toast.error('Failed to save post.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleShare = async () => {
     const text = post.content || 'Check this post on LinkerX!';
     try {
@@ -167,86 +188,75 @@ export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit
   const getReplies = (commentId: string) => comments.filter((c) => c.parentId === commentId);
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: C.bgCard, borderColor: C.border }]}>
       {/* Header */}
       <View style={styles.header}>
         <Avatar uri={post.author?.avatar} name={post.author?.userName} size={38} />
         <View style={styles.headerText}>
-          <Text style={styles.userName}>{post.author?.userName}</Text>
-          <Text style={styles.time}>{timeAgo}</Text>
+          <Text style={[styles.userName, { color: C.textPrimary }]}>{post.author?.userName}</Text>
+          <Text style={[styles.time, { color: C.textMuted }]}>{timeAgo}</Text>
         </View>
         {isOwner && (
           <TouchableOpacity onPress={() => setShowOptions(true)}>
-            <Ionicons name="ellipsis-horizontal" size={18} color={Colors.textMuted} />
+            <Ionicons name="ellipsis-horizontal" size={18} color={C.textMuted} />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Content */}
-      {post.content ? <Text style={styles.content}>{post.content}</Text> : null}
+      {post.content ? <Text style={[styles.content, { color: C.textSecondary }]}>{post.content}</Text> : null}
 
-      {/* Link */}
       {post.linkUrl && (
-        <View style={styles.linkChip}>
-          <Ionicons name="link-outline" size={14} color={Colors.cyan} />
-          <Text style={styles.linkChipText} numberOfLines={1}>{post.linkUrl}</Text>
+        <View style={[styles.linkChip, { backgroundColor: C.bgElevated, borderColor: C.cyanDim }]}>
+          <Ionicons name="link-outline" size={14} color={C.cyan} />
+          <Text style={[styles.linkChipText, { color: C.cyan }]} numberOfLines={1}>{post.linkUrl}</Text>
         </View>
       )}
 
-      {/* Media */}
       {post.mediaUrl && post.type === 'image' && (
         <Image source={{ uri: post.mediaUrl }} style={styles.media} resizeMode="cover" />
       )}
 
-      {/* Reaction summary */}
       {myReaction && (
         <View style={styles.reactionSummary}>
-          <Text style={styles.reactionSummaryText}>
+          <Text style={[styles.reactionSummaryText, { color: C.textMuted }]}>
             {currentReaction?.emoji} You reacted with {myReaction}
           </Text>
         </View>
       )}
 
       {/* Actions */}
-      <View style={styles.actions}>
-        {/* Like / React */}
-        <TouchableOpacity
-          style={styles.action}
-          onPress={() => onLike(post._id)}
-          onLongPress={() => setShowReactions(true)}
-        >
-          {myReaction ? (
-            <Text style={{ fontSize: 20 }}>{currentReaction?.emoji}</Text>
-          ) : (
-            <Ionicons
-              name={isLiked ? 'heart' : 'heart-outline'}
-              size={20}
-              color={isLiked ? '#e05c8a' : Colors.textSecondary}
-            />
-          )}
-          <Text style={[styles.actionText, isLiked && { color: '#e05c8a' }]}>
-            {post.likes.length}
-          </Text>
+      <View style={[styles.actions, { borderTopColor: C.border }]}>
+        <TouchableOpacity style={styles.action} onPress={() => onLike(post._id)} onLongPress={() => setShowReactions(true)}>
+          {myReaction
+            ? <Text style={{ fontSize: 20 }}>{currentReaction?.emoji}</Text>
+            : <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={20} color={isLiked ? '#e05c8a' : C.textSecondary} />
+          }
+          <Text style={[styles.actionText, { color: C.textSecondary }, isLiked && { color: '#e05c8a' }]}>{post.likes.length}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.action} onPress={openComments}>
-          <Ionicons name="chatbubble-outline" size={19} color={Colors.textSecondary} />
-          <Text style={styles.actionText}>{commentsCount}</Text>
+          <Ionicons name="chatbubble-outline" size={19} color={C.textSecondary} />
+          <Text style={[styles.actionText, { color: C.textSecondary }]}>{commentsCount}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.action} onPress={handleShare}>
-          <Ionicons name="share-social-outline" size={20} color={Colors.textSecondary} />
+          <Ionicons name="share-social-outline" size={20} color={C.textSecondary} />
+        </TouchableOpacity>
+
+        <View style={{ flex: 1 }} />
+        <TouchableOpacity style={styles.action} onPress={handleSave} disabled={saving}>
+          <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={20} color={isSaved ? C.purple : C.textSecondary} />
         </TouchableOpacity>
       </View>
 
       {/* Reactions picker */}
       <Modal visible={showReactions} transparent animationType="fade" onRequestClose={() => setShowReactions(false)}>
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowReactions(false)}>
-          <View style={styles.reactionPicker}>
+          <View style={[styles.reactionPicker, { backgroundColor: C.bgCard, borderColor: C.border }]}>
             {REACTIONS.map((r) => (
               <TouchableOpacity key={r.key} style={styles.reactionBtn} onPress={() => handleReact(r.key)}>
                 <Text style={styles.reactionEmoji}>{r.emoji}</Text>
-                <Text style={styles.reactionLabel}>{r.key}</Text>
+                <Text style={[styles.reactionLabel, { color: C.textMuted }]}>{r.key}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -256,15 +266,15 @@ export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit
       {/* Options Modal */}
       <Modal visible={showOptions} transparent animationType="fade" onRequestClose={() => setShowOptions(false)}>
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowOptions(false)}>
-          <View style={styles.optionsMenu}>
+          <View style={[styles.optionsMenu, { backgroundColor: C.bgCard, borderColor: C.border }]}>
             <TouchableOpacity style={styles.optionItem} onPress={() => { setShowOptions(false); setShowEdit(true); }}>
-              <Ionicons name="pencil-outline" size={18} color={Colors.textPrimary} />
-              <Text style={styles.optionText}>Edit Post</Text>
+              <Ionicons name="pencil-outline" size={18} color={C.textPrimary} />
+              <Text style={[styles.optionText, { color: C.textPrimary }]}>Edit Post</Text>
             </TouchableOpacity>
-            <View style={styles.optionDivider} />
+            <View style={[styles.optionDivider, { backgroundColor: C.border }]} />
             <TouchableOpacity style={styles.optionItem} onPress={handleDelete}>
-              <Ionicons name="trash-outline" size={18} color={Colors.error} />
-              <Text style={[styles.optionText, { color: Colors.error }]}>Delete Post</Text>
+              <Ionicons name="trash-outline" size={18} color={C.error} />
+              <Text style={[styles.optionText, { color: C.error }]}>Delete Post</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -273,22 +283,19 @@ export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit
       {/* Edit Modal */}
       <Modal visible={showEdit} transparent animationType="slide" onRequestClose={() => setShowEdit(false)}>
         <View style={styles.overlay}>
-          <View style={styles.editModal}>
-            <Text style={styles.modalTitle}>Edit Post</Text>
+          <View style={[styles.editModal, { backgroundColor: C.bgCard, borderColor: C.border }]}>
+            <Text style={[styles.modalTitle, { color: C.textPrimary }]}>Edit Post</Text>
             <TextInput
-              style={styles.editInput}
-              value={editContent}
-              onChangeText={setEditContent}
-              multiline
-              placeholderTextColor={Colors.textMuted}
+              style={[styles.editInput, { backgroundColor: C.bgElevated, borderColor: C.border, color: C.textPrimary }]}
+              value={editContent} onChangeText={setEditContent} multiline placeholderTextColor={C.textMuted}
             />
             <View style={styles.editActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEdit(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
+              <TouchableOpacity style={[styles.cancelBtn, { backgroundColor: C.bgElevated, borderColor: C.border }]} onPress={() => setShowEdit(false)}>
+                <Text style={[styles.cancelText, { color: C.textMuted }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={handleSaveEdit} disabled={savingEdit}>
-                <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.saveBtn}>
-                  {savingEdit ? <ActivityIndicator color={Colors.white} size="small" /> : <Text style={styles.saveText}>Save</Text>}
+                <LinearGradient colors={[C.purple, C.cyan]} style={styles.saveBtn}>
+                  {savingEdit ? <ActivityIndicator color={C.white} size="small" /> : <Text style={[styles.saveText, { color: C.white }]}>Save</Text>}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -299,56 +306,53 @@ export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit
       {/* Comments Modal */}
       <Modal visible={showComments} transparent animationType="slide" onRequestClose={() => setShowComments(false)}>
         <View style={styles.overlay}>
-          <View style={styles.commentsModal}>
+          <View style={[styles.commentsModal, { backgroundColor: C.bgCard, borderColor: C.border }]}>
             <View style={styles.commentsHeader}>
-              <Text style={styles.modalTitle}>Comments</Text>
+              <Text style={[styles.modalTitle, { color: C.textPrimary }]}>Comments</Text>
               <TouchableOpacity onPress={() => { setShowComments(false); setReplyTo(null); }}>
-                <Ionicons name="close" size={22} color={Colors.textMuted} />
+                <Ionicons name="close" size={22} color={C.textMuted} />
               </TouchableOpacity>
             </View>
 
             {loadingComments ? (
-              <ActivityIndicator color={Colors.purple} style={{ marginTop: 20 }} />
+              <ActivityIndicator color={C.purple} style={{ marginTop: 20 }} />
             ) : (
               <FlatList
                 data={topLevelComments}
                 keyExtractor={(item) => item._id}
                 style={styles.commentsList}
-                ListEmptyComponent={<Text style={styles.noComments}>No comments yet. Be the first!</Text>}
+                ListEmptyComponent={<Text style={[styles.noComments, { color: C.textMuted }]}>No comments yet. Be the first!</Text>}
                 renderItem={({ item }) => {
                   const replies = getReplies(item._id);
                   const commentLiked = item.likes?.includes(currentUserId);
                   return (
                     <View style={styles.commentThread}>
-                      {/* Top-level comment */}
                       <View style={styles.commentRow}>
                         <Avatar uri={item.author?.avatar} name={item.author?.userName} size={30} />
-                        <View style={styles.commentBubble}>
-                          <Text style={styles.commentUser}>{item.author?.userName}</Text>
-                          <Text style={styles.commentText}>{item.text}</Text>
+                        <View style={[styles.commentBubble, { backgroundColor: C.bgElevated, borderColor: C.border }]}>
+                          <Text style={[styles.commentUser, { color: C.purple }]}>{item.author?.userName}</Text>
+                          <Text style={[styles.commentText, { color: C.textSecondary }]}>{item.text}</Text>
                           <View style={styles.commentActions}>
                             <TouchableOpacity style={styles.commentAction} onPress={() => handleLikeComment(item._id)}>
-                              <Ionicons name={commentLiked ? 'heart' : 'heart-outline'} size={13} color={commentLiked ? '#e05c8a' : Colors.textMuted} />
-                              {item.likes?.length > 0 && <Text style={styles.commentActionText}>{item.likes.length}</Text>}
+                              <Ionicons name={commentLiked ? 'heart' : 'heart-outline'} size={13} color={commentLiked ? '#e05c8a' : C.textMuted} />
+                              {item.likes?.length > 0 && <Text style={[styles.commentActionText, { color: C.textMuted }]}>{item.likes.length}</Text>}
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.commentAction} onPress={() => setReplyTo(item)}>
-                              <Text style={styles.replyBtn}>Reply</Text>
+                              <Text style={[styles.replyBtn, { color: C.purple }]}>Reply</Text>
                             </TouchableOpacity>
                           </View>
                         </View>
                       </View>
-
-                      {/* Replies */}
                       {replies.map((reply) => (
                         <View key={reply._id} style={styles.replyRow}>
                           <Avatar uri={reply.author?.avatar} name={reply.author?.userName} size={24} />
-                          <View style={[styles.commentBubble, styles.replyBubble]}>
-                            <Text style={styles.commentUser}>{reply.author?.userName}</Text>
-                            <Text style={styles.commentText}>{reply.text}</Text>
+                          <View style={[styles.commentBubble, styles.replyBubble, { backgroundColor: C.bg, borderColor: C.border }]}>
+                            <Text style={[styles.commentUser, { color: C.purple }]}>{reply.author?.userName}</Text>
+                            <Text style={[styles.commentText, { color: C.textSecondary }]}>{reply.text}</Text>
                             <View style={styles.commentActions}>
                               <TouchableOpacity style={styles.commentAction} onPress={() => handleLikeComment(reply._id)}>
-                                <Ionicons name={reply.likes?.includes(currentUserId) ? 'heart' : 'heart-outline'} size={12} color={Colors.textMuted} />
-                                {reply.likes?.length > 0 && <Text style={styles.commentActionText}>{reply.likes.length}</Text>}
+                                <Ionicons name={reply.likes?.includes(currentUserId) ? 'heart' : 'heart-outline'} size={12} color={C.textMuted} />
+                                {reply.likes?.length > 0 && <Text style={[styles.commentActionText, { color: C.textMuted }]}>{reply.likes.length}</Text>}
                               </TouchableOpacity>
                             </View>
                           </View>
@@ -360,28 +364,24 @@ export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit
               />
             )}
 
-            {/* Reply indicator */}
             {replyTo && (
-              <View style={styles.replyIndicator}>
-                <Text style={styles.replyIndicatorText}>Replying to {replyTo.author.userName}</Text>
+              <View style={[styles.replyIndicator, { backgroundColor: C.purpleDim }]}>
+                <Text style={[styles.replyIndicatorText, { color: C.purpleLight }]}>Replying to {replyTo.author.userName}</Text>
                 <TouchableOpacity onPress={() => setReplyTo(null)}>
-                  <Ionicons name="close" size={16} color={Colors.textMuted} />
+                  <Ionicons name="close" size={16} color={C.textMuted} />
                 </TouchableOpacity>
               </View>
             )}
 
-            {/* Comment input */}
-            <View style={styles.commentInputRow}>
+            <View style={[styles.commentInputRow, { borderTopColor: C.border }]}>
               <TextInput
-                style={styles.commentInput}
+                style={[styles.commentInput, { backgroundColor: C.bgElevated, borderColor: C.border, color: C.textPrimary }]}
                 placeholder={replyTo ? `Reply to ${replyTo.author.userName}...` : 'Write a comment...'}
-                placeholderTextColor={Colors.textMuted}
-                value={commentText}
-                onChangeText={setCommentText}
+                placeholderTextColor={C.textMuted} value={commentText} onChangeText={setCommentText}
               />
               <TouchableOpacity onPress={submitComment} disabled={postingComment || !commentText.trim()}>
-                <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.sendBtn}>
-                  {postingComment ? <ActivityIndicator color={Colors.white} size="small" /> : <Ionicons name="send" size={16} color={Colors.white} />}
+                <LinearGradient colors={[C.purple, C.cyan]} style={styles.sendBtn}>
+                  {postingComment ? <ActivityIndicator color={C.white} size="small" /> : <Ionicons name="send" size={16} color={C.white} />}
                 </LinearGradient>
               </TouchableOpacity>
             </View>

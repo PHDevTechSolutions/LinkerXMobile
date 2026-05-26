@@ -6,6 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
+import { useColors } from '@/hooks/useColors';
 import PostCard, { Post } from '@/components/PostCard';
 import Avatar from '@/components/Avatar';
 import Stories from '@/components/Stories';
@@ -14,6 +15,7 @@ import api from '@/lib/api';
 
 export default function FeedScreen() {
   const { user } = useAuthStore();
+  const C = useColors();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,32 +65,16 @@ export default function FeedScreen() {
     );
   };
 
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <View>
-        <Text style={styles.greeting}>Hi, {user?.userName} 👋</Text>
-        <Text style={styles.subGreeting}>What's on your mind?</Text>
-      </View>
-      <TouchableOpacity>
-        <Avatar uri={user?.avatar} name={user?.userName} size={40} />
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderStory = () => (
-    <Stories />
-  );
-
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={Colors.purple} size="large" />
+      <View style={[styles.center, { backgroundColor: C.bg }]}>
+        <ActivityIndicator color={C.purple} size="large" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: C.bg }]}>
       <FlatList
         data={posts}
         keyExtractor={(item) => item._id}
@@ -105,14 +91,22 @@ export default function FeedScreen() {
         )}
         ListHeaderComponent={
           <>
-            {renderHeader()}
-            {renderStory()}
+            <View style={styles.header}>
+              <View>
+                <Text style={[styles.greeting, { color: C.textPrimary }]}>Hi, {user?.userName} 👋</Text>
+                <Text style={[styles.subGreeting, { color: C.textMuted }]}>What's on your mind?</Text>
+              </View>
+              <TouchableOpacity>
+                <Avatar uri={user?.avatar} name={user?.userName} size={40} />
+              </TouchableOpacity>
+            </View>
+            <Stories />
           </>
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Ionicons name="newspaper-outline" size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>No posts yet. Be the first to post!</Text>
+            <Ionicons name="newspaper-outline" size={48} color={C.textMuted} />
+            <Text style={[styles.emptyText, { color: C.textMuted }]}>No posts yet. Be the first to post!</Text>
           </View>
         }
         contentContainerStyle={styles.list}
@@ -120,7 +114,7 @@ export default function FeedScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); fetchFeed(); }}
-            tintColor={Colors.purple}
+            tintColor={C.purple}
           />
         }
         showsVerticalScrollIndicator={false}
