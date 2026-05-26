@@ -10,7 +10,7 @@ import { Colors } from '@/constants/Colors';
 import Avatar from '@/components/Avatar';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
-import { getSocket } from '@/lib/socket';
+import EmojiPicker from '@/components/EmojiPicker';
 
 type Message = {
   _id: string;
@@ -189,6 +189,8 @@ export default function ChatConversation() {
         <TouchableOpacity style={styles.attachBtn}>
           <Ionicons name="add-circle-outline" size={26} color={Colors.textMuted} />
         </TouchableOpacity>
+
+        <EmojiPicker onSelect={(emoji) => setText((prev) => prev + emoji)} />
 
         <View style={styles.inputWrapper}>
           <TextInput

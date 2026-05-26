@@ -135,7 +135,10 @@ export default function CallScreen() {
         setStatus('connected');
       });
 
-      socket.on('webrtc_end_call', () => endCall());
+      socket.on('webrtc_end_call', ({ callId: endedCallId }: any) => {
+        // Only end if it's for this specific call
+        if (endedCallId === callId) endCall();
+      });
 
       // Create and send offer with caller info
       const offer = await pc.createOffer();
@@ -172,6 +175,7 @@ export default function CallScreen() {
       socket.off('webrtc_answer');
       socket.off('webrtc_ice_candidate');
       socket.off('webrtc_end_call');
+      // Only notify the other party, not ourselves
       socket.emit('webrtc_end_call', { targetUserId: id, callId });
     }
   };
