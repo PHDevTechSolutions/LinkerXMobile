@@ -189,11 +189,15 @@ export default function CallScreen() {
       // Remote track → show remote video
       pc.ontrack = (event) => {
         console.log('🎥 Got remote track:', event.track.kind);
-        const stream = event.streams[0];
-        remoteStreamRef.current = stream; // persist so late-mounting video gets it
+        const remoteStream = event.streams[0];
+        remoteStreamRef.current = remoteStream;
         if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = stream;
+          remoteVideoRef.current.srcObject = remoteStream;
+          remoteVideoRef.current.play().catch((e) =>
+            console.warn('Remote video play error:', e)
+          );
         }
+        // Only flip to connected once we have a video (or audio-only) track
         setStatus('connected');
       };
 
@@ -274,14 +278,15 @@ export default function CallScreen() {
 
       // ── Caller path ────────────────────────────────────────────────────
       } else {
-        // Wait for callee's answer
+        // Wait for callee's answer — set remote desc then wait for ontrack
         socket.on('webrtc_answer', async ({ answer }: any) => {
           if (!pcRef.current || remoteDescSet.current) return;
           console.log('📥 Got answer from callee');
           await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
           remoteDescSet.current = true;
           await drainIceCandidates(pcRef.current);
-          setStatus('connected');
+          // Do NOT setStatus('connected') here — wait for ontrack to fire
+          // so the remote video element is ready before we show it
         });
 
         // Create and send offer
@@ -335,11 +340,12 @@ export default function CallScreen() {
   }, []);
 
   // Attach remote stream to video element once it mounts (handles late mount)
-  // This fires when status changes to 'connected' and the video becomes visible
   const setRemoteVideoRef = useCallback((el: HTMLVideoElement | null) => {
     remoteVideoRef.current = el;
-    if (el && remoteStreamRef.current) {
+    if (!el) return; // unmounting — nothing to do
+    if (remoteStreamRef.current) {
       el.srcObject = remoteStreamRef.current;
+      el.play().catch((e) => console.warn('Remote video play error:', e));
     }
   }, []);
 
@@ -372,24 +378,23 @@ export default function CallScreen() {
   // ── Web WebRTC UI ─────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* Remote video — always rendered so ref callback fires immediately on mount */}
+
+      {/* Remote video — ALWAYS mounted and visible (black bg when no stream yet).
+          Never use display:none — it unmounts the element and breaks the ref. */}
       <video
         ref={setRemoteVideoRef}
         autoPlay
         playsInline
         style={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
+          top: 0, left: 0,
+          width: '100%', height: '100%',
           objectFit: 'cover',
           backgroundColor: '#000',
-          display: status === 'connected' ? 'block' : 'none',
         } as any}
       />
 
-      {/* Connecting / ringing / ended overlay */}
+      {/* Overlay shown while connecting/ringing/ended — sits on top of remote video */}
       {status !== 'connected' && (
         <LinearGradient
           colors={[Colors.purple + '55', Colors.bg]}
