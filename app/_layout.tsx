@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,30 +13,29 @@ import GlobalMusicPlayer from '@/components/MusicPlayer';
 import { useToastStore } from '@/lib/toast';
 import { getSocket } from '@/lib/socket';
 import { useColors } from '@/hooks/useColors';
+import { requestNotificationPermission, showCallNotification, flashTabTitle } from '@/lib/callNotification';
+import { playMessageSound, playCallSound } from '@/lib/sounds';
 
 function GlobalToast() {
   const { visible, message, type, hide } = useToastStore();
   return <Toast visible={visible} message={message} type={type} onHide={hide} />;
 }
 
+// Module-level ref so GlobalIncomingCall can stop alerts without prop drilling
+let _stopCallAlerts: (() => void) | null = null;
+
 function GlobalIncomingCall() {
   const { incomingCall, setIncomingCall, setPendingOffer } = useCallStore();
   if (!incomingCall) return null;
 
   const handleAccept = () => {
-    // Save the offer into the store BEFORE navigating.
-    // By the time CallScreen mounts, the socket event is already gone —
-    // so CallScreen reads the offer from the store instead.
+    _stopCallAlerts?.();
     setPendingOffer({
       offer: incomingCall.offer,
       fromUserId: incomingCall.callerId,
       callId: incomingCall.callId,
     });
-
-    // Clear the incoming call banner first
     setIncomingCall(null);
-
-    // Navigate to call screen as callee
     router.push(
       `/call/${incomingCall.callerId}?type=${incomingCall.callType}&userName=${encodeURIComponent(
         incomingCall.callerName
@@ -45,6 +44,7 @@ function GlobalIncomingCall() {
   };
 
   const handleDecline = () => {
+    _stopCallAlerts?.();
     const { token } = useAuthStore.getState();
     if (token) {
       const socket = getSocket(token);
@@ -80,7 +80,29 @@ export default function RootLayout() {
   const theme = useSettingsStore((s) => s.theme);
   const C     = useColors();
 
+  // Cleanup ref for browser call notification
+  const callNotifCleanup = useRef<(() => void) | null>(null);
+  const tabTitleCleanup  = useRef<(() => void) | null>(null);
+  const callSoundStop    = useRef<(() => void) | null>(null);
+
+  const stopCallAlerts = () => {
+    callNotifCleanup.current?.();
+    tabTitleCleanup.current?.();
+    callSoundStop.current?.();
+    callNotifCleanup.current = null;
+    tabTitleCleanup.current  = null;
+    callSoundStop.current    = null;
+  };
+
+  // Expose to GlobalIncomingCall
+  _stopCallAlerts = stopCallAlerts;
+
   useEffect(() => { loadAuth(); }, []);
+
+  // Request browser notification permission once on startup
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
 
   // Listen for incoming calls + all notifications globally
   useEffect(() => {
@@ -94,6 +116,38 @@ export default function RootLayout() {
         return;
       }
       setIncomingCall(data);
+
+      // Start call ringtone
+      callSoundStop.current = playCallSound();
+
+      // Fire browser system notification + tab title flash
+      const cleanup = showCallNotification(
+        data.callerName,
+        data.callType,
+        () => {
+          stopCallAlerts();
+          useCallStore.getState().setPendingOffer({
+            offer: data.offer,
+            fromUserId: data.callerId,
+            callId: data.callId,
+          });
+          useCallStore.getState().setIncomingCall(null);
+          router.push(
+            `/call/${data.callerId}?type=${data.callType}&userName=${encodeURIComponent(data.callerName)}&incoming=true&callId=${data.callId}` as any
+          );
+        },
+        () => {
+          stopCallAlerts();
+          const { token: t } = useAuthStore.getState();
+          if (t) {
+            const s = getSocket(t);
+            s.emit('webrtc_end_call', { targetUserId: data.callerId, callId: data.callId });
+          }
+          useCallStore.getState().setIncomingCall(null);
+        }
+      );
+      callNotifCleanup.current = cleanup;
+      tabTitleCleanup.current  = flashTabTitle(data.callerName);
     };
 
     const onNotification = (data: any) => {
@@ -111,6 +165,11 @@ export default function RootLayout() {
         fromUserAvatar: data.fromUserAvatar,
         targetId: data.targetId,
       });
+
+      // Play message sound for incoming messages
+      if (data.type === 'message' && messageNotifications) {
+        playMessageSound();
+      }
 
       if (data.type === 'message') incrementUnreadMessages();
     };

@@ -19,6 +19,7 @@ import { useColors } from '@/hooks/useColors';
 import { uploadImage, uploadFile, uploadImageFromWeb, uploadFileFromWeb } from '@/lib/cloudinary';
 import LinkPreview from '@/components/LinkPreview';
 import { useActivityStore } from '@/store/activityStore';
+import { playMessageSound } from '@/lib/sounds';
 
 // Detect URLs in message text
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/i;
@@ -98,6 +99,8 @@ export default function ChatConversation() {
         );
         return [...filtered, msg];
       });
+      // Play sound only for messages from the other person
+      if (msg.senderId !== user?._id) playMessageSound();
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     });
 

@@ -14,6 +14,7 @@ import { toast } from '@/lib/toast';
 import api from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 import GroupPlaylist from '@/components/GroupPlaylist';
+import { playMessageSound } from '@/lib/sounds';
 
 type Member = { _id: string; userName: string; avatar?: string; isAdmin: boolean };
 type GroupMessage = {
@@ -74,6 +75,7 @@ export default function GroupConversation() {
         const filtered = prev.filter((m) => !m.pending || m.text !== msg.text);
         return [...filtered, msg];
       });
+      if (msg.senderId !== user?._id) playMessageSound();
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     });
 

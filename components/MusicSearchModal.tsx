@@ -43,7 +43,7 @@ export default function MusicSearchModal({ visible, onClose, onSelectForPlaylist
     }
     playTrack(track);
     onClose();
-  }, [playTrack, onClose]);
+  }, [playTrack, onClose, onSelectForPlaylist]);
 
   const handleClose = () => {
     setQuery('');
@@ -68,7 +68,9 @@ export default function MusicSearchModal({ visible, onClose, onSelectForPlaylist
             <LinearGradient colors={[C.purple, C.cyan]} style={styles.headerIcon}>
               <Ionicons name="musical-notes" size={18} color={C.white} />
             </LinearGradient>
-            <Text style={[styles.headerTitle, { color: C.textPrimary }]}>Music Player</Text>
+            <Text style={[styles.headerTitle, { color: C.textPrimary }]}>
+              {onSelectForPlaylist ? 'Add to Playlist' : 'Music Player'}
+            </Text>
             <TouchableOpacity onPress={handleClose} style={[styles.closeBtn, { backgroundColor: C.bgElevated }]}>
               <Ionicons name="close" size={20} color={C.textMuted} />
             </TouchableOpacity>
@@ -181,9 +183,9 @@ export default function MusicSearchModal({ visible, onClose, onSelectForPlaylist
                       style={styles.playIconGradient}
                     >
                       <Ionicons
-                        name={active && isPlaying ? 'pause' : 'play'}
+                        name={onSelectForPlaylist ? 'add' : (active && isPlaying ? 'pause' : 'play')}
                         size={16}
-                        color={active ? C.white : C.textMuted}
+                        color={active || onSelectForPlaylist ? C.white : C.textMuted}
                       />
                     </LinearGradient>
                   </TouchableOpacity>
