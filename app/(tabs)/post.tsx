@@ -14,6 +14,7 @@ import { uploadImage, uploadImageFromWeb } from '@/lib/cloudinary';
 import { getYoutubeThumbnail } from '@/lib/youtube';
 import { YouTubeSearchResult } from '@/hooks/useYouTubeSearch';
 import VideoPickerModal from '@/components/VideoPickerModal';
+import AiPostPanel from '@/components/AiPostPanel';
 import api from '@/lib/api';
 
 type PostType = 'text' | 'link' | 'image' | 'video' | 'file';
@@ -31,6 +32,8 @@ export default function PostScreen() {
   // Video state — selected from picker
   const [selectedVideo, setSelectedVideo] = useState<YouTubeSearchResult | null>(null);
   const [showVideoPicker, setShowVideoPicker] = useState(false);
+  // AI panel
+  const [showAi, setShowAi] = useState(false);
 
   const pickImage = async () => {
     if (Platform.OS === 'web') {
@@ -132,7 +135,19 @@ export default function PostScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.title, { color: C.textPrimary }]}>Create Post</Text>
+        {/* Header row with AI button */}
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, { color: C.textPrimary }]}>Create Post</Text>
+          <TouchableOpacity
+            style={[styles.aiBtn, { backgroundColor: C.bgCard, borderColor: C.border }]}
+            onPress={() => setShowAi(true)}
+          >
+            <LinearGradient colors={['#4F46E5', '#7C3AED', '#06B6D4']} style={styles.aiBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+              <Ionicons name="sparkles" size={16} color="#fff" />
+            </LinearGradient>
+            <Text style={[styles.aiBtnText, { color: C.purple }]}>AI</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Type selector */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeRow} contentContainerStyle={styles.typeRowContent}>
@@ -289,6 +304,19 @@ export default function PostScreen() {
         onSelect={(video) => setSelectedVideo(video)}
         selectedVideoId={selectedVideo?.videoId}
       />
+
+      {/* AI Post Panel */}
+      <AiPostPanel
+        visible={showAi}
+        onClose={() => setShowAi(false)}
+        currentText={content}
+        onApplyText={(text) => setContent(text)}
+        onApplyImage={(localUri, cloudUrl) => {
+          setType('image');
+          setImage(localUri);
+          setImageUrl(cloudUrl);
+        }}
+      />
     </>
   );
 }
@@ -296,7 +324,11 @@ export default function PostScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   content: { padding: 20, paddingBottom: 40 },
-  title: { color: Colors.textPrimary, fontSize: 24, fontWeight: '700', marginBottom: 20 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  title: { color: Colors.textPrimary, fontSize: 24, fontWeight: '700' },
+  aiBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
+  aiBtnGradient: { width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  aiBtnText: { fontSize: 13, fontWeight: '700' },
 
   typeRow: { marginBottom: 16 },
   typeRowContent: { gap: 8, paddingRight: 4 },

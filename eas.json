@@ -7,7 +7,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao"
+        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao",
+        "EXPO_PUBLIC_GEMINI_API_KEY": "AIzaSyDyuRGDNbcz50l67-zXSZunc3v1FMYtbgQ"
       }
     },
     "preview": {
@@ -16,7 +17,8 @@
       },
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao"
+        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao",
+        "EXPO_PUBLIC_GEMINI_API_KEY": "AIzaSyDyuRGDNbcz50l67-zXSZunc3v1FMYtbgQ"
       }
     },
     "production": {
@@ -24,7 +26,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao"
+        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao",
+        "EXPO_PUBLIC_GEMINI_API_KEY": "AIzaSyDyuRGDNbcz50l67-zXSZunc3v1FMYtbgQ"
       }
     }
   },
