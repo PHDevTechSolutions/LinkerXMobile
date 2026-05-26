@@ -163,6 +163,37 @@ io.on("connection", (socket) => {
     socket.join(`user_${socket.userId}`);
   });
 
+  // ── Live Activity: Now Playing ────────────────────────────────────────────
+  socket.on("now_playing", ({ track }) => {
+    // Broadcast to all rooms this user is in (chats, groups)
+    // Store in memory so others can query it
+    socket.data.nowPlaying = track || null;
+    // Broadcast to anyone who has an open chat with this user
+    socket.broadcast.emit("user_now_playing", {
+      userId: socket.userId,
+      track: track || null,
+    });
+  });
+
+  // ── Watch Together ────────────────────────────────────────────────────────
+  socket.on("watch_together_start", ({ chatId, videoId, title, thumbnail }) => {
+    socket.to(chatId).emit("watch_together_start", {
+      fromUserId: socket.userId,
+      videoId, title, thumbnail,
+    });
+  });
+
+  socket.on("watch_together_sync", ({ chatId, videoId, currentTime, isPlaying }) => {
+    socket.to(chatId).emit("watch_together_sync", {
+      fromUserId: socket.userId,
+      videoId, currentTime, isPlaying,
+    });
+  });
+
+  socket.on("watch_together_stop", ({ chatId }) => {
+    socket.to(chatId).emit("watch_together_stop", { fromUserId: socket.userId });
+  });
+
   socket.on("send_group_message", async ({ groupId, text }) => {
     try {
       const { ObjectId } = require("mongodb");

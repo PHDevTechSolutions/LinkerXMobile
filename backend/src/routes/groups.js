@@ -302,4 +302,80 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// ─── COLLABORATIVE PLAYLIST ───────────────────────────────────────────────────
+
+// GET /api/groups/:id/playlist
+router.get("/:id/playlist", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const group = await db.collection("groups").findOne({ _id: new ObjectId(req.params.id) });
+    if (!group) return res.status(404).json({ message: "Group not found." });
+    if (!group.memberIds.includes(req.user.userId)) return res.status(403).json({ message: "Not a member." });
+    const playlist = group.playlist || [];
+    return res.status(200).json({ playlist });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error." });
+  }
+});
+
+// POST /api/groups/:id/playlist — add a track
+router.post("/:id/playlist", async (req, res) => {
+  try {
+    const { videoId, title, channelTitle, thumbnail } = req.body;
+    if (!videoId || !title) return res.status(400).json({ message: "videoId and title required." });
+
+    const db = await connectToDatabase();
+    const group = await db.collection("groups").findOne({ _id: new ObjectId(req.params.id) });
+    if (!group) return res.status(404).json({ message: "Group not found." });
+    if (!group.memberIds.includes(req.user.userId)) return res.status(403).json({ message: "Not a member." });
+
+    const user = await db.collection("users").findOne({ _id: new ObjectId(req.user.userId) });
+    const track = {
+      id: new ObjectId().toString(),
+      videoId, title, channelTitle: channelTitle || "", thumbnail: thumbnail || "",
+      addedBy: { _id: req.user.userId, userName: user?.userName || "Unknown" },
+      addedAt: new Date(),
+    };
+
+    await db.collection("groups").updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $push: { playlist: track } }
+    );
+
+    // Notify group via socket
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`group_${req.params.id}`).emit("playlist_updated", { groupId: req.params.id, track, action: "add" });
+    }
+
+    return res.status(201).json({ track });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error." });
+  }
+});
+
+// DELETE /api/groups/:id/playlist/:trackId — remove a track
+router.delete("/:id/playlist/:trackId", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const group = await db.collection("groups").findOne({ _id: new ObjectId(req.params.id) });
+    if (!group) return res.status(404).json({ message: "Group not found." });
+    if (!group.memberIds.includes(req.user.userId)) return res.status(403).json({ message: "Not a member." });
+
+    await db.collection("groups").updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $pull: { playlist: { id: req.params.trackId } } }
+    );
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`group_${req.params.id}`).emit("playlist_updated", { groupId: req.params.id, trackId: req.params.trackId, action: "remove" });
+    }
+
+    return res.status(200).json({ message: "Track removed." });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error." });
+  }
+});
+
 module.exports = router;
