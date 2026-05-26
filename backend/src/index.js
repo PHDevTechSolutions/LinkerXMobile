@@ -85,6 +85,10 @@ io.on("connection", (socket) => {
 
   // ── WebRTC Signaling ──────────────────────────────────────────────────────
   socket.on("webrtc_offer", ({ targetUserId, offer, callId, callerName, callerAvatar, callType }) => {
+    console.log(`📞 Call from ${socket.userId} to ${targetUserId}, room: user_${targetUserId}`);
+    const roomSize = io.sockets.adapter.rooms.get(`user_${targetUserId}`)?.size || 0;
+    console.log(`📱 Room user_${targetUserId} has ${roomSize} socket(s)`);
+
     // Send incoming call notification to receiver
     socket.to(`user_${targetUserId}`).emit("webrtc_incoming_call", {
       callId,
