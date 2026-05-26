@@ -186,12 +186,13 @@ export default function CallScreen() {
             iceServers: iceData.iceServers,
             iceCandidatePoolSize: 10,
           };
-          console.log('✅ Got fresh ICE servers from Xirsys');
+          console.log('✅ ICE servers:', JSON.stringify(iceData.iceServers));
         } else {
-          console.warn('⚠️ ICE server fetch failed, using fallback STUN');
+          const errText = await iceRes.text();
+          console.warn('⚠️ ICE fetch failed:', iceRes.status, errText, '— using fallback STUN');
         }
       } catch (e) {
-        console.warn('⚠️ ICE server fetch error, using fallback STUN:', e);
+        console.warn('⚠️ ICE fetch error, using fallback STUN:', e);
       }
       // Get local media
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -229,11 +230,15 @@ export default function CallScreen() {
       // Send ICE candidates to peer
       pc.onicecandidate = (event) => {
         if (event.candidate) {
+          // Log candidate type: 'host'=local, 'srflx'=STUN, 'relay'=TURN
+          console.log(`🧊 ICE candidate [${event.candidate.type}]:`, event.candidate.candidate);
           socket.emit('webrtc_ice_candidate', {
             targetUserId: id,
             candidate: event.candidate,
             callId,
           });
+        } else {
+          console.log('🧊 ICE gathering complete');
         }
       };
 

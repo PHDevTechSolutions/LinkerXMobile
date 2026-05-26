@@ -19,23 +19,38 @@ router.get("/ice-servers", async (req, res) => {
       return res.status(500).json({ message: "Xirsys credentials not configured." });
     }
 
+    const basicAuth = Buffer.from(`${ident}:${secret}`).toString("base64");
+
+    // Xirsys v3 API — PUT request to get TURN credentials
     const response = await fetch(`https://global.xirsys.net/_turn/${channel}`, {
       method: "PUT",
       headers: {
-        "Authorization": "Basic " + Buffer.from(`${ident}:${secret}`).toString("base64"),
+        "Authorization": `Basic ${basicAuth}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ format: "urls" }),
     });
 
-    const data = await response.json();
+    const text = await response.text();
+    console.log("Xirsys raw response:", text);
 
-    if (!response.ok || data.s !== "ok") {
-      console.error("Xirsys error:", data);
-      return res.status(500).json({ message: "Failed to fetch ICE servers." });
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error("Xirsys non-JSON response:", text);
+      return res.status(500).json({ message: "Xirsys returned invalid response." });
     }
 
-    return res.status(200).json({ iceServers: data.v.iceServers });
+    if (data.s !== "ok") {
+      console.error("Xirsys error:", data);
+      return res.status(500).json({ message: data.e || "Failed to fetch ICE servers." });
+    }
+
+    // data.v.iceServers is the array of ICE server objects
+    const iceServers = data.v.iceServers;
+    console.log("✅ Xirsys ICE servers fetched:", JSON.stringify(iceServers));
+    return res.status(200).json({ iceServers });
   } catch (err) {
     console.error("ICE servers error:", err);
     return res.status(500).json({ message: "Server error." });
