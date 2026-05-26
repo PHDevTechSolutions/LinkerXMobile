@@ -217,8 +217,16 @@ export default function CallScreen() {
         if (pc.connectionState === 'failed') endCall();
       };
 
+      // Fallback: if ontrack fires before React re-renders (callee side),
+      // also flip to connected when ICE reaches connected/completed state
       pc.oniceconnectionstatechange = () => {
         console.log('ICE state:', pc.iceConnectionState);
+        if (
+          pc.iceConnectionState === 'connected' ||
+          pc.iceConnectionState === 'completed'
+        ) {
+          setStatus('connected');
+        }
       };
 
       socket.emit('join_user_room');
