@@ -271,14 +271,25 @@ export default function ProfileScreen() {
         {/* ── Download APK ── */}
         <TouchableOpacity
           style={[styles.apkBtn, { backgroundColor: C.bgCard, borderColor: C.cyan + '50' }]}
-          onPress={() => Linking.openURL('https://expo.dev/accounts/phdevtechsolutions/projects/linkerx-mobile/builds')}
+          onPress={() => {
+            const url = process.env.EXPO_PUBLIC_APK_DOWNLOAD_URL;
+            if (url) {
+              Linking.openURL(url);
+            } else {
+              Linking.openURL('https://expo.dev/accounts/phdevtechsolutions/projects/linkerx-mobile/builds');
+            }
+          }}
         >
           <LinearGradient colors={[C.cyan, C.purple]} style={styles.apkIcon}>
             <Ionicons name="download-outline" size={20} color={C.white} />
           </LinearGradient>
           <View style={{ flex: 1 }}>
             <Text style={[styles.apkLabel, { color: C.textPrimary }]}>Download Android APK</Text>
-            <Text style={[styles.apkSub, { color: C.textMuted }]}>Install LinkerX on your Android device</Text>
+            <Text style={[styles.apkSub, { color: C.textMuted }]}>
+              {process.env.EXPO_PUBLIC_APK_DOWNLOAD_URL
+                ? 'Tap to download the latest build'
+                : 'Build not yet available'}
+            </Text>
           </View>
           <Ionicons name="open-outline" size={16} color={C.textMuted} />
         </TouchableOpacity>
