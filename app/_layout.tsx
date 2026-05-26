@@ -9,7 +9,6 @@ import Toast from '@/components/Toast';
 import IncomingCall from '@/components/IncomingCall';
 import { useToastStore } from '@/lib/toast';
 import { getSocket } from '@/lib/socket';
-// ✅ removed unused useIncomingCall import
 
 function GlobalToast() {
   const { visible, message, type, hide } = useToastStore();
@@ -17,12 +16,23 @@ function GlobalToast() {
 }
 
 function GlobalIncomingCall() {
-  const { incomingCall, setIncomingCall } = useCallStore();
+  const { incomingCall, setIncomingCall, setPendingOffer } = useCallStore();
   if (!incomingCall) return null;
 
   const handleAccept = () => {
+    // Save the offer into the store BEFORE navigating.
+    // By the time CallScreen mounts, the socket event is already gone —
+    // so CallScreen reads the offer from the store instead.
+    setPendingOffer({
+      offer: incomingCall.offer,
+      fromUserId: incomingCall.callerId,
+      callId: incomingCall.callId,
+    });
+
+    // Clear the incoming call banner first
     setIncomingCall(null);
-    // ✅ pass incoming=true and callId so CallScreen reuses the same callId
+
+    // Navigate to call screen as callee
     router.push(
       `/call/${incomingCall.callerId}?type=${incomingCall.callType}&userName=${encodeURIComponent(
         incomingCall.callerName
@@ -60,18 +70,25 @@ export default function RootLayout() {
 
   useEffect(() => { loadAuth(); }, []);
 
-  // Listen for incoming calls globally
+  // Listen for incoming calls globally and store them (including the offer)
   useEffect(() => {
     if (!token) return;
     const socket = getSocket(token);
 
+    const onIncomingCall = (data: any) => {
+      console.log('📞 Incoming call received:', data);
+      // data must include: callId, callerId, callerName, callerAvatar, callType, offer
+      if (!data?.offer) {
+        console.warn('⚠️ webrtc_incoming_call missing offer — ignoring');
+        return;
+      }
+      setIncomingCall(data);
+    };
+
     const joinAndListen = () => {
       console.log('🔌 Socket connected, joining user room:', socket.id);
       socket.emit('join_user_room');
-      socket.on('webrtc_incoming_call', (data: any) => {
-        console.log('📞 Incoming call received:', data);
-        setIncomingCall(data);
-      });
+      socket.on('webrtc_incoming_call', onIncomingCall);
     };
 
     if (socket.connected) {
@@ -82,7 +99,7 @@ export default function RootLayout() {
 
     return () => {
       socket.off('connect', joinAndListen);
-      socket.off('webrtc_incoming_call');
+      socket.off('webrtc_incoming_call', onIncomingCall);
     };
   }, [token]);
 
