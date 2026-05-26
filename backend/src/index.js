@@ -115,6 +115,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("webrtc_end_call", ({ targetUserId, callId }) => {
+    // Send end call only to the target, not back to sender
     socket.to(`user_${targetUserId}`).emit("webrtc_end_call", { callId });
   });
 

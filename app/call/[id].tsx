@@ -56,7 +56,7 @@ export default function CallScreen() {
     }, 100);
     return () => {
       clearTimeout(timeout);
-      if (isInitialized.current) cleanup();
+      if (isInitialized.current) cleanup(false); // Don't send end signal on unmount
     };
   }, []);
 
@@ -117,9 +117,15 @@ export default function CallScreen() {
       };
 
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        console.log('WebRTC connection state:', pc.connectionState);
+        // Only end on 'failed' — not 'disconnected' which can be temporary
+        if (pc.connectionState === 'failed') {
           endCall();
         }
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        console.log('ICE state:', pc.iceConnectionState);
       };
 
       // Socket signaling
@@ -161,29 +167,35 @@ export default function CallScreen() {
       });
       setStatus('ringing');
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('WebRTC error:', err);
-      setStatus('ended');
+      // Only end call if it's a real error, not a permission issue
+      if (err.name === 'NotAllowedError') {
+        setStatus('ended');
+        setTimeout(() => router.back(), 500);
+      } else {
+        setStatus('ringing'); // Keep ringing even if media fails
+      }
     }
   };
 
   const endCall = useCallback(() => {
-    cleanup();
+    cleanup(true);
     setStatus('ended');
     setTimeout(() => router.back(), 1000);
   }, []);
 
-  const cleanup = () => {
+  const cleanup = (sendEndSignal = true) => {
     clearInterval(timerRef.current);
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     pcRef.current?.close();
-    if (token) {
+    pcRef.current = null;
+    if (sendEndSignal && token && isInitialized.current) {
       const socket = getSocket(token);
       socket.off('webrtc_offer');
       socket.off('webrtc_answer');
       socket.off('webrtc_ice_candidate');
       socket.off('webrtc_end_call');
-      // Only notify the other party, not ourselves
       socket.emit('webrtc_end_call', { targetUserId: id, callId });
     }
   };
