@@ -5,17 +5,26 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao"
+      }
     },
     "preview": {
       "android": {
         "buildType": "apk"
       },
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao"
+      }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao"
       }
     }
   },

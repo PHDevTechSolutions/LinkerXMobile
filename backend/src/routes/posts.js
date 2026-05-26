@@ -11,7 +11,7 @@ router.use(authMiddleware);
 // POST /api/posts/create
 router.post("/create", async (req, res) => {
   try {
-    const { type = "text", content, linkUrl, mediaUrl } = req.body;
+    const { type = "text", content, linkUrl, mediaUrl, videoMeta } = req.body;
 
     // Allow posts that have at least one of: content, linkUrl, or mediaUrl
     if (!content && !linkUrl && !mediaUrl) {
@@ -30,6 +30,7 @@ router.post("/create", async (req, res) => {
       content: content || "",
       linkUrl: linkUrl || null,
       mediaUrl: mediaUrl || null,
+      videoMeta: videoMeta || null,
       author: {
         _id: author._id.toString(),
         userName: author.userName,

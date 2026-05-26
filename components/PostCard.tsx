@@ -10,6 +10,13 @@ import { useColors } from '@/hooks/useColors';
 import Avatar from './Avatar';
 import api from '@/lib/api';
 import { toast } from '@/lib/toast';
+import { extractYouTubeId, getYoutubeThumbnail, getYoutubeEmbedUrl } from '@/lib/youtube';
+
+// WebView for native YouTube embed
+let WebView: any = null;
+if (Platform.OS !== 'web') {
+  WebView = require('react-native-webview').WebView;
+}
 
 export type Post = {
   _id: string;
@@ -21,6 +28,12 @@ export type Post = {
   likes: string[];
   commentsCount: number;
   createdAt: string;
+  videoMeta?: {
+    videoId: string;
+    title: string;
+    channelTitle: string;
+    thumbnail: string;
+  };
 };
 
 type Comment = {
@@ -65,7 +78,6 @@ export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit
   // Reactions
   const [showReactions, setShowReactions]   = useState(false);
   const [myReaction, setMyReaction]         = useState<string | null>(null);
-  const [reactionCounts, setReactionCounts] = useState<Record<string, string[]>>({});
 
   // Comments
   const [showComments, setShowComments]     = useState(false);
@@ -215,6 +227,17 @@ export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit
       {post.mediaUrl && post.type === 'image' && (
         <Image source={{ uri: post.mediaUrl }} style={styles.media} resizeMode="cover" />
       )}
+
+      {/* ── YouTube video embed ── */}
+      {post.type === 'video' && post.mediaUrl && (() => {
+        const videoId = extractYouTubeId(post.mediaUrl);
+        if (!videoId) return null;
+        const thumb = getYoutubeThumbnail(videoId);
+        const embedUrl = getYoutubeEmbedUrl(videoId);
+        return (
+          <VideoEmbed videoId={videoId} embedUrl={embedUrl} thumbnail={thumb} C={C} />
+        );
+      })()}
 
       {myReaction && (
         <View style={styles.reactionSummary}>
@@ -392,6 +415,72 @@ export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit
   );
 }
 
+function VideoEmbed({ videoId, embedUrl, thumbnail, C }: {
+  videoId: string;
+  embedUrl: string;
+  thumbnail: string;
+  C: any;
+}) {
+  const [playing, setPlaying] = useState(false);
+
+  if (!playing) {
+    // Show thumbnail with play button — tap to load the actual embed
+    return (
+      <TouchableOpacity
+        style={styles.videoWrap}
+        onPress={() => setPlaying(true)}
+        activeOpacity={0.9}
+      >
+        <Image source={{ uri: thumbnail }} style={styles.videoThumb} resizeMode="cover" />
+        <View style={styles.videoOverlay}>
+          <View style={styles.videoPlayBtn}>
+            <Ionicons name="logo-youtube" size={36} color="#FF0000" />
+          </View>
+        </View>
+        <View style={[styles.videoLabel, { backgroundColor: C.bgCard }]}>
+          <Ionicons name="logo-youtube" size={12} color="#FF0000" />
+          <Text style={[styles.videoLabelText, { color: C.textMuted }]}>Tap to play</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  // Web: iframe embed
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.videoWrap}>
+        <iframe
+          src={`${embedUrl}&autoplay=1`}
+          allow="autoplay; encrypted-media; fullscreen"
+          allowFullScreen
+          style={{ width: '100%', height: '100%', border: 'none', borderRadius: 12 } as any}
+          title={videoId}
+        />
+      </View>
+    );
+  }
+
+  // Native: WebView embed
+  const html = `<!DOCTYPE html><html><head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>* { margin:0; padding:0; background:#000; } iframe { width:100%; height:100%; border:none; }</style>
+    </head><body>
+    <iframe src="${embedUrl}&autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    </body></html>`;
+
+  return (
+    <View style={styles.videoWrap}>
+      <WebView
+        source={{ html }}
+        allowsInlineMediaPlayback
+        mediaPlaybackRequiresUserAction={false}
+        javaScriptEnabled
+        style={{ flex: 1, borderRadius: 12, backgroundColor: '#000' }}
+      />
+    </View>
+  );
+}
+
 function formatTimeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -473,4 +562,28 @@ const styles = StyleSheet.create({
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: Colors.border },
   commentInput: { flex: 1, backgroundColor: Colors.bgElevated, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 14, paddingVertical: 10, color: Colors.textPrimary, fontSize: 14 },
   sendBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+
+  // Video embed
+  videoWrap: {
+    width: '100%', height: 210,
+    borderRadius: 12, overflow: 'hidden',
+    marginBottom: 10, backgroundColor: '#000',
+  },
+  videoThumb: { width: '100%', height: '100%' },
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  videoPlayBtn: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  videoLabel: {
+    position: 'absolute', bottom: 8, left: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8,
+  },
+  videoLabelText: { fontSize: 11 },
 });
