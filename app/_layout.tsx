@@ -140,6 +140,10 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="settings/change-password" />
+        <Stack.Screen name="settings/privacy" />
+        <Stack.Screen name="settings/help" />
+        <Stack.Screen name="settings/about" />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="new-chat" />
         <Stack.Screen name="new-group" />
@@ -153,6 +157,7 @@ export default function RootLayout() {
         <Stack.Screen name="profile/files" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="bio/[userName]" />
+        <Stack.Screen name="rss/index" />
       </Stack>
       <GlobalToast />
       <GlobalIncomingCall />

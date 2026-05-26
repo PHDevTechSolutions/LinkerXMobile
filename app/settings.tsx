@@ -179,13 +179,13 @@ export default function SettingsScreen() {
         <SectionHeader title="ACCOUNT" />
         <View style={[styles.card, { backgroundColor: C.bgCard, borderColor: C.border }]}>
           {[
-            { icon: 'lock-closed-outline' as const, label: 'Change Password', color: C.purple },
-            { icon: 'shield-outline'       as const, label: 'Privacy',         color: C.cyan },
-            { icon: 'help-circle-outline'  as const, label: 'Help & Support',  color: C.success },
-            { icon: 'information-circle-outline' as const, label: 'About LinkerX', color: C.textMuted },
+            { icon: 'lock-closed-outline' as const, label: 'Change Password', color: C.purple,   route: '/settings/change-password' },
+            { icon: 'shield-outline'       as const, label: 'Privacy',         color: C.cyan,     route: '/settings/privacy' },
+            { icon: 'help-circle-outline'  as const, label: 'Help & Support',  color: C.success,  route: '/settings/help' },
+            { icon: 'information-circle-outline' as const, label: 'About LinkerX', color: C.textMuted, route: '/settings/about' },
           ].map((item, i, arr) => (
             <React.Fragment key={item.label}>
-              <TouchableOpacity style={styles.row}>
+              <TouchableOpacity style={styles.row} onPress={() => router.push(item.route as any)}>
                 <View style={[styles.rowIcon, { backgroundColor: item.color + '22' }]}>
                   <Ionicons name={item.icon} size={18} color={item.color} />
                 </View>
