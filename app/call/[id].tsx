@@ -41,15 +41,23 @@ export default function CallScreen() {
   const pcRef          = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const timerRef       = useRef<any>(null);
-  const callId         = `call_${id}_${Date.now()}`;
+  const callId         = useRef(`call_${id}_${Date.now()}`).current;
+  const isInitialized  = useRef(false); // prevent cleanup before init
 
   useEffect(() => {
     if (!IS_WEB) {
       openMobile();
       return;
     }
-    initWebRTC();
-    return () => cleanup();
+    // Small delay to avoid React strict mode double-invoke issue
+    const timeout = setTimeout(() => {
+      isInitialized.current = true;
+      initWebRTC();
+    }, 100);
+    return () => {
+      clearTimeout(timeout);
+      if (isInitialized.current) cleanup();
+    };
   }, []);
 
   useEffect(() => {
