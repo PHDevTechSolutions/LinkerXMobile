@@ -157,7 +157,7 @@ export default function ChatConversation() {
             {isTyping && <Text style={styles.typingText}>typing...</Text>}
           </View>
         </View>
-        <TouchableOpacity style={styles.headerAction} onPress={() => router.push(`/call/${id}?type=video&userName=${encodeURIComponent(otherUser?.userName || '')}&avatar=${encodeURIComponent(otherUser?.avatar || '')}` as any)}>
+        <TouchableOpacity style={styles.headerAction} onPress={() => router.push(`/call/${otherUser?._id}?type=video&userName=${encodeURIComponent(otherUser?.userName || '')}&avatar=${encodeURIComponent(otherUser?.avatar || '')}` as any)}>
           <Ionicons name="videocam-outline" size={20} color={Colors.textMuted} />
         </TouchableOpacity>
       </View>
