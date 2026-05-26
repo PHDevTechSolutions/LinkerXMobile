@@ -10,6 +10,7 @@ import { Colors } from '@/constants/Colors';
 import Avatar from '@/components/Avatar';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import EmojiPicker from '@/components/EmojiPicker';
 
 type Message = {
