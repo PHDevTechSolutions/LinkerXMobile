@@ -11,9 +11,10 @@ router.use(authMiddleware);
 // POST /api/posts/create
 router.post("/create", async (req, res) => {
   try {
-    const { type = "text", content, linkUrl } = req.body;
+    const { type = "text", content, linkUrl, mediaUrl } = req.body;
 
-    if (!content && !linkUrl) {
+    // Allow posts that have at least one of: content, linkUrl, or mediaUrl
+    if (!content && !linkUrl && !mediaUrl) {
       return res.status(400).json({ message: "Content is required." });
     }
 
@@ -28,7 +29,7 @@ router.post("/create", async (req, res) => {
       type,
       content: content || "",
       linkUrl: linkUrl || null,
-      media: null,
+      mediaUrl: mediaUrl || null,
       author: {
         _id: author._id.toString(),
         userName: author.userName,
@@ -63,6 +64,8 @@ router.get("/feed", async (req, res) => {
     const formatted = allPosts.map((p) => ({
       ...p,
       _id: p._id.toString(),
+      // normalize: old posts used 'media', new posts use 'mediaUrl'
+      mediaUrl: p.mediaUrl || p.media || null,
     }));
 
     return res.status(200).json({ posts: formatted });
