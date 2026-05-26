@@ -11,8 +11,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/Colors';
 import { useColors } from '@/hooks/useColors';
 import Avatar from '@/components/Avatar';
+import MusicSearchModal from '@/components/MusicSearchModal';
 import { useAuthStore } from '@/store/authStore';
 import { useNotificationStore } from '@/store/notificationStore';
+import { useMusicStore } from '@/store/musicStore';
 import { disconnectSocket } from '@/lib/socket';
 import { toast } from '@/lib/toast';
 import { uploadImage, uploadImageFromWeb } from '@/lib/cloudinary';
@@ -27,7 +29,9 @@ type Stats = {
 export default function ProfileScreen() {
   const { user, clearAuth, setAuth, token } = useAuthStore();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const { currentTrack, isPlaying, togglePlay } = useMusicStore();
   const C = useColors();
+  const [showMusicModal, setShowMusicModal] = useState(false);
   const [stats, setStats] = useState<Stats>({
     postsCount: 0,
     followersCount: user?.followersCount || 0,
@@ -120,6 +124,13 @@ export default function ProfileScreen() {
   ];
 
   const menuItems = [
+    {
+      icon: 'musical-notes-outline' as const,
+      label: 'Music Player',
+      sub: currentTrack ? `▶ ${currentTrack.title}` : 'Search & play YouTube music',
+      onPress: () => setShowMusicModal(true),
+      accent: true,
+    },
     {
       icon: 'link-outline'    as const,
       label: 'My Links',
@@ -233,15 +244,26 @@ export default function ProfileScreen() {
         {/* ── Menu ── */}
         <View style={styles.menu}>
           {menuItems.map((item) => (
-            <TouchableOpacity key={item.label} style={[styles.menuItem, { backgroundColor: C.bgCard, borderColor: C.border }]} onPress={item.onPress}>
-              <View style={[styles.menuIcon, { backgroundColor: C.purpleDim }]}>
-                <Ionicons name={item.icon} size={20} color={C.purple} />
-              </View>
+            <TouchableOpacity key={item.label} style={[styles.menuItem, { backgroundColor: C.bgCard, borderColor: (item as any).accent ? C.purpleDim : C.border }]} onPress={item.onPress}>
+              <LinearGradient
+                colors={(item as any).accent ? [C.purple, C.cyan] : [C.purpleDim, C.purpleDim]}
+                style={styles.menuIcon}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Ionicons name={item.icon} size={20} color={(item as any).accent ? C.white : C.purple} />
+              </LinearGradient>
               <View style={styles.menuText}>
                 <Text style={[styles.menuLabel, { color: C.textPrimary }]}>{item.label}</Text>
-                <Text style={[styles.menuSub, { color: C.textMuted }]}>{item.sub}</Text>
+                <Text style={[styles.menuSub, { color: (item as any).accent && currentTrack ? C.purpleLight : C.textMuted }]} numberOfLines={1}>{item.sub}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={C.textMuted} />
+              {(item as any).accent && currentTrack ? (
+                <TouchableOpacity onPress={togglePlay} style={styles.miniPlayBtn}>
+                  <Ionicons name={isPlaying ? 'pause-circle' : 'play-circle'} size={28} color={C.purple} />
+                </TouchableOpacity>
+              ) : (
+                <Ionicons name="chevron-forward" size={16} color={C.textMuted} />
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -252,6 +274,12 @@ export default function ProfileScreen() {
           <Text style={[styles.logoutText, { color: C.error }]}>Sign Out</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ── Music Search Modal ── */}
+      <MusicSearchModal
+        visible={showMusicModal}
+        onClose={() => setShowMusicModal(false)}
+      />
     </ScrollView>
   );
 }
@@ -338,4 +366,7 @@ const styles = StyleSheet.create({
     padding: 16, borderWidth: 1, borderColor: Colors.error + '40',
   },
   logoutText: { color: Colors.error, fontWeight: '600', fontSize: 15 },
+  miniPlayBtn: {
+    padding: 2,
+  },
 });

@@ -8,6 +8,7 @@ import { useNotificationStore } from '@/store/notificationStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import Toast from '@/components/Toast';
 import IncomingCall from '@/components/IncomingCall';
+import GlobalMusicPlayer from '@/components/MusicPlayer';
 import { useToastStore } from '@/lib/toast';
 import { getSocket } from '@/lib/socket';
 import { useColors } from '@/hooks/useColors';
@@ -154,6 +155,7 @@ export default function RootLayout() {
       </Stack>
       <GlobalToast />
       <GlobalIncomingCall />
+      <GlobalMusicPlayer />
     </GestureHandlerRootView>
   );
 }
