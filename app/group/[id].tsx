@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Colors } from '@/constants/Colors';
+import { useColors } from '@/hooks/useColors';
 import Avatar from '@/components/Avatar';
 import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/lib/toast';
@@ -37,6 +38,7 @@ type GroupInfo = {
 export default function GroupConversation() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user, token } = useAuthStore();
+  const C = useColors();
   const [group, setGroup] = useState<GroupInfo | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [text, setText] = useState('');
@@ -161,16 +163,16 @@ export default function GroupConversation() {
         )}
         <View style={styles.msgContent}>
           {showSenderName && !isMe && (
-            <Text style={styles.senderName}>{item.sender?.userName}</Text>
+            <Text style={[styles.senderName, { color: C.purpleLight }]}>{item.sender?.userName}</Text>
           )}
           <View style={[
             styles.bubble,
-            isMe ? styles.bubbleMe : styles.bubbleThem,
+            isMe ? [styles.bubbleMe, { backgroundColor: C.purple }] : [styles.bubbleThem, { backgroundColor: C.bgCard, borderColor: C.border }],
             item.pending && styles.bubblePending,
           ]}>
-            <Text style={[styles.bubbleText, isMe && styles.bubbleTextMe]}>{item.text}</Text>
+            <Text style={[styles.bubbleText, isMe ? { color: C.white } : { color: C.textSecondary }]}>{item.text}</Text>
             {showTime && (
-              <Text style={[styles.bubbleTime, isMe && styles.bubbleTimeMe]}>
+              <Text style={[styles.bubbleTime, isMe ? { color: 'rgba(255,255,255,0.6)', textAlign: 'right' } : { color: C.textMuted }]}>
                 {formatTime(item.createdAt)}{isMe ? (item.pending ? ' ·' : ' ✓') : ''}
               </Text>
             )}
@@ -181,40 +183,45 @@ export default function GroupConversation() {
   };
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator color={Colors.purple} size="large" /></View>;
+    return <View style={[styles.center, { backgroundColor: C.bg }]}><ActivityIndicator color={C.purple} size="large" /></View>;
   }
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: C.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+      <View style={[styles.header, { backgroundColor: C.bgCard, borderBottomColor: C.border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: C.bgElevated }]}>
+          <Ionicons name="arrow-back" size={22} color={C.textPrimary} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.headerInfo} onPress={() => setShowSettings(true)}>
           {group?.avatar ? (
             <Avatar uri={group.avatar} name={group.name} size={36} />
           ) : (
-            <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.groupIconSmall}>
-              <Ionicons name={group?.type === 'community' ? 'globe' : 'people'} size={16} color={Colors.white} />
+            <LinearGradient colors={[C.purple, C.cyan]} style={styles.groupIconSmall}>
+              <Ionicons name={group?.type === 'community' ? 'globe' : 'people'} size={16} color={C.white} />
             </LinearGradient>
           )}
           <View>
-            <Text style={styles.headerName}>{group?.name}</Text>
-            <Text style={styles.headerSub}>
+            <Text style={[styles.headerName, { color: C.textPrimary }]}>{group?.name}</Text>
+            <Text style={[styles.headerSub, { color: C.cyan }]}>
               {isTyping ? `${isTyping} is typing...` : `${group?.memberIds.length} members`}
             </Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerAction} onPress={() => setShowPlaylist(true)}>
-          <Ionicons name="musical-notes-outline" size={20} color={Colors.purple} />
+        {/* Playlist button — purple so it's always visible */}
+        <TouchableOpacity
+          style={[styles.headerAction, { backgroundColor: C.purpleDim }]}
+          onPress={() => setShowPlaylist(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="musical-notes" size={20} color={C.purple} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerAction} onPress={() => setShowSettings(true)}>
-          <Ionicons name="ellipsis-vertical" size={20} color={Colors.textMuted} />
+        <TouchableOpacity style={[styles.headerAction, { backgroundColor: C.bgElevated }]} onPress={() => setShowSettings(true)}>
+          <Ionicons name="ellipsis-vertical" size={20} color={C.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -242,12 +249,12 @@ export default function GroupConversation() {
       />
 
       {/* Input */}
-      <View style={styles.inputRow}>
-        <View style={styles.inputWrapper}>
+      <View style={[styles.inputRow, { backgroundColor: C.bgCard, borderTopColor: C.border }]}>
+        <View style={[styles.inputWrapper, { backgroundColor: C.bgElevated, borderColor: C.border }]}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: C.textPrimary }]}
             placeholder="Message..."
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor={C.textMuted}
             value={text}
             onChangeText={handleTextChange}
             multiline
@@ -257,57 +264,56 @@ export default function GroupConversation() {
         </View>
         <TouchableOpacity onPress={sendMessage} disabled={!text.trim()}>
           <LinearGradient
-            colors={text.trim() ? [Colors.purple, Colors.cyan] : [Colors.bgElevated, Colors.bgElevated]}
+            colors={text.trim() ? [C.purple, C.cyan] : [C.bgElevated, C.bgElevated]}
             style={styles.sendBtn}
           >
-            <Ionicons name="send" size={18} color={text.trim() ? Colors.white : Colors.textMuted} />
+            <Ionicons name="send" size={18} color={text.trim() ? C.white : C.textMuted} />
           </LinearGradient>
         </TouchableOpacity>
       </View>
 
       {/* Settings Modal */}
       <Modal visible={showSettings} animationType="slide" onRequestClose={() => setShowSettings(false)}>
-        <View style={styles.settingsContainer}>
-          <View style={styles.settingsHeader}>
-            <TouchableOpacity onPress={() => setShowSettings(false)} style={styles.backBtn}>
-              <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+        <View style={[styles.settingsContainer, { backgroundColor: C.bg }]}>
+          <View style={[styles.settingsHeader, { backgroundColor: C.bgCard, borderBottomColor: C.border }]}>
+            <TouchableOpacity onPress={() => setShowSettings(false)} style={[styles.backBtn, { backgroundColor: C.bgElevated }]}>
+              <Ionicons name="arrow-back" size={22} color={C.textPrimary} />
             </TouchableOpacity>
-            <Text style={styles.settingsTitle}>Group Info</Text>
+            <Text style={[styles.settingsTitle, { color: C.textPrimary }]}>Group Info</Text>
             <View style={{ width: 38 }} />
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Group avatar + name */}
             <View style={styles.settingsProfile}>
               {group?.avatar ? (
                 <Avatar uri={group.avatar} name={group.name} size={80} />
               ) : (
-                <LinearGradient colors={[Colors.purple, Colors.cyan]} style={styles.settingsGroupIcon}>
-                  <Ionicons name={group?.type === 'community' ? 'globe' : 'people'} size={36} color={Colors.white} />
+                <LinearGradient colors={[C.purple, C.cyan]} style={styles.settingsGroupIcon}>
+                  <Ionicons name={group?.type === 'community' ? 'globe' : 'people'} size={36} color={C.white} />
                 </LinearGradient>
               )}
-              <Text style={styles.settingsGroupName}>{group?.name}</Text>
+              <Text style={[styles.settingsGroupName, { color: C.textPrimary }]}>{group?.name}</Text>
               {group?.description ? (
-                <Text style={styles.settingsGroupDesc}>{group.description}</Text>
+                <Text style={[styles.settingsGroupDesc, { color: C.textMuted }]}>{group.description}</Text>
               ) : null}
-              <View style={styles.settingsTypeBadge}>
-                <Ionicons name={group?.type === 'community' ? 'globe-outline' : 'people-outline'} size={12} color={Colors.cyan} />
-                <Text style={styles.settingsTypeBadgeText}>
+              <View style={[styles.settingsTypeBadge, { backgroundColor: C.cyanDim }]}>
+                <Ionicons name={group?.type === 'community' ? 'globe-outline' : 'people-outline'} size={12} color={C.cyan} />
+                <Text style={[styles.settingsTypeBadgeText, { color: C.cyan }]}>
                   {group?.type === 'community' ? 'Community' : 'Group'} · {group?.memberIds.length} members
                 </Text>
               </View>
             </View>
 
             {/* Members */}
-            <Text style={styles.settingsSectionLabel}>MEMBERS</Text>
+            <Text style={[styles.settingsSectionLabel, { color: C.textMuted }]}>MEMBERS</Text>
             {group?.members.map((member) => (
-              <View key={member._id} style={styles.memberRow}>
+              <View key={member._id} style={[styles.memberRow, { borderBottomColor: C.border }]}>
                 <Avatar uri={member.avatar} name={member.userName} size={42} />
                 <View style={styles.memberInfo}>
-                  <Text style={styles.memberName}>{member.userName}</Text>
+                  <Text style={[styles.memberName, { color: C.textPrimary }]}>{member.userName}</Text>
                   {member.isAdmin && (
-                    <View style={styles.adminBadge}>
-                      <Text style={styles.adminBadgeText}>Admin</Text>
+                    <View style={[styles.adminBadge, { backgroundColor: C.purpleDim }]}>
+                      <Text style={[styles.adminBadgeText, { color: C.purpleLight }]}>Admin</Text>
                     </View>
                   )}
                 </View>
@@ -315,17 +321,17 @@ export default function GroupConversation() {
                   <View style={styles.memberActions}>
                     {!member.isAdmin && (
                       <TouchableOpacity
-                        style={styles.memberActionBtn}
+                        style={[styles.memberActionBtn, { backgroundColor: C.bgElevated }]}
                         onPress={() => handlePromote(member._id, member.userName)}
                       >
-                        <Ionicons name="shield-outline" size={16} color={Colors.cyan} />
+                        <Ionicons name="shield-outline" size={16} color={C.cyan} />
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
-                      style={styles.memberActionBtn}
+                      style={[styles.memberActionBtn, { backgroundColor: C.bgElevated }]}
                       onPress={() => handleRemoveMember(member._id, member.userName)}
                     >
-                      <Ionicons name="person-remove-outline" size={16} color={Colors.error} />
+                      <Ionicons name="person-remove-outline" size={16} color={C.error} />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -334,9 +340,9 @@ export default function GroupConversation() {
 
             {/* Actions */}
             <View style={styles.settingsActions}>
-              <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave}>
-                <Ionicons name="exit-outline" size={18} color={Colors.error} />
-                <Text style={styles.leaveBtnText}>Leave {group?.type === 'community' ? 'Community' : 'Group'}</Text>
+              <TouchableOpacity style={[styles.leaveBtn, { backgroundColor: C.bgCard, borderColor: C.error + '40' }]} onPress={handleLeave}>
+                <Ionicons name="exit-outline" size={18} color={C.error} />
+                <Text style={[styles.leaveBtnText, { color: C.error }]}>Leave {group?.type === 'community' ? 'Community' : 'Group'}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
