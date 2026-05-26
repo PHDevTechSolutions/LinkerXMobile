@@ -21,7 +21,8 @@ import { getSocket } from '@/lib/socket';
 const IS_WEB = Platform.OS === 'web';
 const WHEREBY_URL = 'https://whereby.com/linkerx';
 
-const STUN_SERVERS: RTCConfiguration = {
+// Fallback ICE config used only if the API fetch fails
+const FALLBACK_ICE: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
@@ -63,6 +64,9 @@ export default function CallScreen() {
   const timerRef        = useRef<ReturnType<typeof setInterval> | null>(null);
   const isInitialized   = useRef(false);
   const endedRef        = useRef(false); // guard against double-cleanup
+  const reconnectTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectCount  = useRef(0);
+  const MAX_RECONNECTS  = 3;
 
   // Callee reuses the same callId so webrtc_end_call matches on both sides
   const callId = useRef(
@@ -94,6 +98,7 @@ export default function CallScreen() {
       endedRef.current = true;
 
       if (timerRef.current) clearInterval(timerRef.current);
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
       pcRef.current?.close();
       pcRef.current = null;
@@ -168,6 +173,26 @@ export default function CallScreen() {
     const socket = getSocket(token);
 
     try {
+      // Fetch fresh ICE servers from backend (Xirsys dynamic credentials)
+      let iceConfig: RTCConfiguration = FALLBACK_ICE;
+      try {
+        const apiUrl = process.env.EXPO_PUBLIC_API_URL || '';
+        const iceRes = await fetch(`${apiUrl}/api/calls/ice-servers`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (iceRes.ok) {
+          const iceData = await iceRes.json();
+          iceConfig = {
+            iceServers: iceData.iceServers,
+            iceCandidatePoolSize: 10,
+          };
+          console.log('✅ Got fresh ICE servers from Xirsys');
+        } else {
+          console.warn('⚠️ ICE server fetch failed, using fallback STUN');
+        }
+      } catch (e) {
+        console.warn('⚠️ ICE server fetch error, using fallback STUN:', e);
+      }
       // Get local media
       const stream = await navigator.mediaDevices.getUserMedia({
         video: type !== 'voice',
@@ -180,8 +205,8 @@ export default function CallScreen() {
         localVideoRef.current.srcObject = stream;
       }
 
-      // Create peer connection
-      const pc = new RTCPeerConnection(STUN_SERVERS);
+      // Create peer connection with fresh Xirsys TURN servers
+      const pc = new RTCPeerConnection(iceConfig);
       pcRef.current = pc;
 
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
@@ -197,7 +222,7 @@ export default function CallScreen() {
             console.warn('Remote video play error:', e)
           );
         }
-        // Only flip to connected once we have a video (or audio-only) track
+        // Flip to connected on any track (audio or video)
         setStatus('connected');
       };
 
@@ -214,7 +239,39 @@ export default function CallScreen() {
 
       pc.onconnectionstatechange = () => {
         console.log('WebRTC state:', pc.connectionState);
-        if (pc.connectionState === 'failed') endCall();
+        if (pc.connectionState === 'failed') {
+          // Try ICE restart before giving up
+          if (reconnectCount.current < MAX_RECONNECTS) {
+            reconnectCount.current += 1;
+            console.log(`🔄 Reconnecting... attempt ${reconnectCount.current}/${MAX_RECONNECTS}`);
+            setStatus('ringing');
+            reconnectTimer.current = setTimeout(async () => {
+              if (!pcRef.current || endedRef.current) return;
+              try {
+                // ICE restart: create a new offer with iceRestart flag
+                const offer = await pcRef.current.createOffer({ iceRestart: true });
+                await pcRef.current.setLocalDescription(offer);
+                socket.emit('webrtc_offer', {
+                  targetUserId: id,
+                  offer,
+                  callId,
+                  callerName: user?.userName || 'Unknown',
+                  callerAvatar: user?.avatar || null,
+                  callType: type,
+                });
+              } catch (e) {
+                console.warn('ICE restart failed:', e);
+                endCall();
+              }
+            }, 2000);
+          } else {
+            console.log('❌ Max reconnects reached, ending call');
+            endCall();
+          }
+        }
+        if (pc.connectionState === 'connected') {
+          reconnectCount.current = 0; // reset on successful reconnect
+        }
       };
 
       // Fallback: if ontrack fires before React re-renders (callee side),
@@ -226,6 +283,11 @@ export default function CallScreen() {
           pc.iceConnectionState === 'completed'
         ) {
           setStatus('connected');
+        }
+        // ICE disconnected = temporary network blip, show reconnecting UI
+        if (pc.iceConnectionState === 'disconnected') {
+          console.log('⚠️ ICE disconnected — waiting for recovery...');
+          setStatus('ringing');
         }
       };
 
@@ -416,8 +478,12 @@ export default function CallScreen() {
                 ? 'Connecting...'
                 : status === 'ringing'
                 ? incoming === 'true'
-                  ? 'Connecting to caller...'
-                  : 'Ringing...'
+                  ? reconnectCount.current > 0
+                    ? `Reconnecting... (${reconnectCount.current}/${MAX_RECONNECTS})`
+                    : 'Connecting to caller...'
+                  : reconnectCount.current > 0
+                    ? `Reconnecting... (${reconnectCount.current}/${MAX_RECONNECTS})`
+                    : 'Ringing...'
                 : 'Call ended'}
             </Text>
             {status !== 'ended' && (

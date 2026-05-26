@@ -7,6 +7,41 @@ router.use(authMiddleware);
 const DAILY_API_KEY  = process.env.DAILY_API_KEY;
 const DAILY_BASE_URL = "https://api.daily.co/v1";
 
+// GET /api/calls/ice-servers
+// Returns fresh Xirsys ICE server credentials (valid for ~30s each request)
+router.get("/ice-servers", async (req, res) => {
+  try {
+    const ident   = process.env.XIRSYS_IDENT;
+    const secret  = process.env.XIRSYS_SECRET;
+    const channel = process.env.XIRSYS_CHANNEL;
+
+    if (!ident || !secret || !channel) {
+      return res.status(500).json({ message: "Xirsys credentials not configured." });
+    }
+
+    const response = await fetch(`https://global.xirsys.net/_turn/${channel}`, {
+      method: "PUT",
+      headers: {
+        "Authorization": "Basic " + Buffer.from(`${ident}:${secret}`).toString("base64"),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ format: "urls" }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.s !== "ok") {
+      console.error("Xirsys error:", data);
+      return res.status(500).json({ message: "Failed to fetch ICE servers." });
+    }
+
+    return res.status(200).json({ iceServers: data.v.iceServers });
+  } catch (err) {
+    console.error("ICE servers error:", err);
+    return res.status(500).json({ message: "Server error." });
+  }
+});
+
 // POST /api/calls/room
 router.post("/room", async (req, res) => {
   try {
