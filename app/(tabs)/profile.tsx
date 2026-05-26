@@ -132,6 +132,12 @@ export default function ProfileScreen() {
       accent: true,
     },
     {
+      icon: 'globe-outline' as const,
+      label: 'My Bio Page',
+      sub: `linkerx/@${user?.userName}`,
+      onPress: () => router.push(`/bio/${user?.userName}` as any),
+    },
+    {
       icon: 'link-outline'    as const,
       label: 'My Links',
       sub: 'Your saved links',

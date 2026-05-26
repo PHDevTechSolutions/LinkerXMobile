@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator,
-  RefreshControl, TextInput, Linking, Modal, Pressable, Alert,
+  RefreshControl, TextInput, Linking, Modal, Pressable, Alert, Share, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
+import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/lib/toast';
 import api from '@/lib/api';
 
@@ -14,6 +15,7 @@ type Link = { _id: string; title: string; url: string; createdAt: string };
 
 export default function MyLinksScreen() {
   const C = useColors();
+  const { user } = useAuthStore();
   const [links, setLinks]           = useState<Link[]>([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -21,6 +23,8 @@ export default function MyLinksScreen() {
   const [title, setTitle]           = useState('');
   const [url, setUrl]               = useState('');
   const [saving, setSaving]         = useState(false);
+
+  const bioUrl = `linkerx/@${user?.userName}`;
 
   const fetchLinks = useCallback(async () => {
     try { const { data } = await api.get('/api/profile/links'); setLinks(data.links || []); }
@@ -52,6 +56,20 @@ export default function MyLinksScreen() {
     else Alert.alert('Delete Link', 'Are you sure?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: () => deleteLink(id) }]);
   };
 
+  const handleShareBio = async () => {
+    const fullUrl = `https://linkerxmobile-production.up.railway.app/bio/${user?.userName}`;
+    try {
+      if (Platform.OS === 'web' && navigator.share) {
+        await navigator.share({ title: `${user?.userName} on LinkerX`, url: fullUrl });
+      } else if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(fullUrl);
+        toast.success('Bio link copied!');
+      } else {
+        await Share.share({ message: `Check out my LinkerX bio: ${fullUrl}` });
+      }
+    } catch (_) {}
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: C.bg }]}>
       <View style={[styles.header, { backgroundColor: C.bgCard, borderBottomColor: C.border }]}>
@@ -73,6 +91,28 @@ export default function MyLinksScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchLinks(); }} tintColor={C.purple} />}
+          ListHeaderComponent={
+            <LinearGradient
+              colors={[C.purple + 'cc', C.cyan + 'aa']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.bioBanner}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.bioBannerLabel}>Your Bio Page</Text>
+                <Text style={styles.bioBannerUrl} numberOfLines={1}>{bioUrl}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.bioBannerViewBtn}
+                onPress={() => router.push(`/bio/${user?.userName}` as any)}
+              >
+                <Ionicons name="eye-outline" size={16} color="#fff" />
+                <Text style={styles.bioBannerViewText}>View</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.bioBannerShareBtn} onPress={handleShareBio}>
+                <Ionicons name="share-outline" size={16} color="#fff" />
+              </TouchableOpacity>
+            </LinearGradient>
+          }
           renderItem={({ item }) => (
             <View style={[styles.linkCard, { backgroundColor: C.bgCard, borderColor: C.border }]}>
               <View style={[styles.linkIcon, { backgroundColor: C.purpleDim }]}>
@@ -94,7 +134,7 @@ export default function MyLinksScreen() {
             <View style={styles.empty}>
               <Ionicons name="link-outline" size={52} color={C.textMuted} />
               <Text style={[styles.emptyTitle, { color: C.textPrimary }]}>No links yet</Text>
-              <Text style={[styles.emptySub, { color: C.textMuted }]}>Tap + to add your first link.</Text>
+              <Text style={[styles.emptySub, { color: C.textMuted }]}>Add links to show on your bio page.</Text>
               <TouchableOpacity style={styles.emptyAddBtn} onPress={() => setShowModal(true)}>
                 <LinearGradient colors={[C.purple, C.cyan]} style={styles.emptyAddGradient}>
                   <Ionicons name="add" size={18} color={C.white} />
@@ -146,13 +186,20 @@ const styles = StyleSheet.create({
   headerTitle:    { fontSize: 17, fontWeight: '700' },
   addBtn:         { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   list:           { padding: 16, paddingBottom: 32, gap: 10 },
+  // Bio banner
+  bioBanner:      { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 14, marginBottom: 6 },
+  bioBannerLabel: { color: '#fff', fontSize: 11, fontWeight: '700', opacity: 0.8, letterSpacing: 0.5 },
+  bioBannerUrl:   { color: '#fff', fontSize: 13, fontWeight: '600', marginTop: 2 },
+  bioBannerViewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  bioBannerViewText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  bioBannerShareBtn: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, padding: 6 },
   linkCard:       { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 14, borderWidth: 1 },
   linkIcon:       { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   linkInfo:       { flex: 1 },
   linkTitle:      { fontSize: 14, fontWeight: '600' },
   linkUrl:        { fontSize: 12, marginTop: 2 },
   iconBtn:        { padding: 6 },
-  empty:          { alignItems: 'center', marginTop: 80, gap: 10, paddingHorizontal: 32 },
+  empty:          { alignItems: 'center', marginTop: 60, gap: 10, paddingHorizontal: 32 },
   emptyTitle:     { fontSize: 17, fontWeight: '700' },
   emptySub:       { fontSize: 13, textAlign: 'center' },
   emptyAddBtn:    { marginTop: 8, borderRadius: 12, overflow: 'hidden' },

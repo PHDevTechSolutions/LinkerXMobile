@@ -17,6 +17,14 @@ import { getSocket } from '@/lib/socket';
 import EmojiPicker from '@/components/EmojiPicker';
 import { useColors } from '@/hooks/useColors';
 import { uploadImage, uploadFile, uploadImageFromWeb, uploadFileFromWeb } from '@/lib/cloudinary';
+import LinkPreview from '@/components/LinkPreview';
+
+// Detect URLs in message text
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/i;
+function extractUrl(text: string): string | null {
+  const m = text?.match(URL_REGEX);
+  return m ? m[0] : null;
+}
 
 type Attachment = { url: string; type: 'image' | 'file'; fileName?: string };
 
@@ -268,6 +276,10 @@ export default function ChatConversation() {
               )}
               {!!item.text && (
                 <Text style={[styles.bubbleText, isMe ? { color: C.white } : { color: C.textSecondary }]}>{item.text}</Text>
+              )}
+              {/* Link preview for messages containing URLs */}
+              {!!item.text && extractUrl(item.text) && (
+                <LinkPreview url={extractUrl(item.text)!} compact={true} />
               )}
               {showTime && (
                 <Text style={[styles.bubbleTime, isMe ? { color: 'rgba(255,255,255,0.6)', textAlign: 'right' } : { color: C.textMuted }]}>

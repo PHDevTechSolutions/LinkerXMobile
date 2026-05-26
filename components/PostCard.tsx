@@ -11,6 +11,7 @@ import Avatar from './Avatar';
 import api from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { extractYouTubeId, getYoutubeThumbnail } from '@/lib/youtube';
+import LinkPreview from './LinkPreview';
 
 export type Post = {
   _id: string;
@@ -212,9 +213,12 @@ export default function PostCard({ post, currentUserId, onLike, onDelete, onEdit
       {post.content ? <Text style={[styles.content, { color: C.textSecondary }]}>{post.content}</Text> : null}
 
       {post.linkUrl && (
-        <View style={[styles.linkChip, { backgroundColor: C.bgElevated, borderColor: C.cyanDim }]}>
-          <Ionicons name="link-outline" size={14} color={C.cyan} />
-          <Text style={[styles.linkChipText, { color: C.cyan }]} numberOfLines={1}>{post.linkUrl}</Text>
+        <View>
+          <View style={[styles.linkChip, { backgroundColor: C.bgElevated, borderColor: C.cyanDim }]}>
+            <Ionicons name="link-outline" size={14} color={C.cyan} />
+            <Text style={[styles.linkChipText, { color: C.cyan }]} numberOfLines={1}>{post.linkUrl}</Text>
+          </View>
+          <LinkPreview url={post.linkUrl} />
         </View>
       )}
 

@@ -152,6 +152,7 @@ export default function RootLayout() {
         <Stack.Screen name="profile/links" />
         <Stack.Screen name="profile/files" />
         <Stack.Screen name="notifications" />
+        <Stack.Screen name="bio/[userName]" />
       </Stack>
       <GlobalToast />
       <GlobalIncomingCall />
