@@ -5,29 +5,17 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao",
-        "EXPO_PUBLIC_GROQ_API_KEY": "YOUR_GROQ_API_KEY_HERE"
-      }
+      "distribution": "internal"
     },
     "preview": {
       "android": {
         "buildType": "apk"
       },
-      "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao",
-        "EXPO_PUBLIC_GROQ_API_KEY": "YOUR_GROQ_API_KEY_HERE"
-      }
+      "distribution": "internal"
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
-      },
-      "env": {
-        "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao",
-        "EXPO_PUBLIC_GROQ_API_KEY": "YOUR_GROQ_API_KEY_HERE"
       }
     }
   },
