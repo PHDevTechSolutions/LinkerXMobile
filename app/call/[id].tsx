@@ -46,7 +46,9 @@ export default function CallScreen() {
   }>();
 
   const { user, token } = useAuthStore();
-  const { pendingOffer, setPendingOffer } = useCallStore();
+  // NOTE: we read pendingOffer via getState() inside initWebRTC (not from hook)
+  // so we always get the latest value, not a stale closure snapshot.
+  const { setPendingOffer } = useCallStore();
 
   const [status, setStatus]     = useState<'connecting' | 'ringing' | 'connected' | 'ended'>('connecting');
   const [muted, setMuted]       = useState(false);
@@ -251,24 +253,20 @@ export default function CallScreen() {
           // status flips to 'connected' via ontrack
         };
 
-        // Primary: use the offer saved by GlobalIncomingCall before navigation
-        const stored = pendingOffer;
+        // Primary: use the offer saved by GlobalIncomingCall before navigation.
+        // Read directly from store (not hook closure) to get the freshest value.
+        const stored = useCallStore.getState().pendingOffer;
         if (stored && stored.callId === callId) {
           setPendingOffer(null); // consume it
           await processOffer(stored.offer, stored.fromUserId);
-        } else {
-          // Fallback: offer arrives slightly after screen mounts
-          console.warn('⚠️ No stored offer — waiting for webrtc_offer socket event...');
-          socket.once('webrtc_offer', async ({ fromUserId, offer }: any) => {
-            await processOffer(offer, fromUserId);
-          });
         }
 
-        // Also handle re-offers (e.g. ICE restart)
+        // Always listen for (re-)offers via socket:
+        // - covers the fallback case where pendingOffer was missing
+        // - handles ICE restarts / re-negotiation
+        // processOffer guards against double-processing via remoteDescSet.current
         socket.on('webrtc_offer', async ({ fromUserId, offer }: any) => {
-          if (!remoteDescSet.current) {
-            await processOffer(offer, fromUserId);
-          }
+          await processOffer(offer, fromUserId);
         });
 
       // ── Caller path ────────────────────────────────────────────────────
