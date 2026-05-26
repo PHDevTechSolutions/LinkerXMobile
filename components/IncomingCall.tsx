@@ -19,8 +19,8 @@ export default function IncomingCall({ callerName, callerAvatar, callType, onAcc
   useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.1, duration: 600, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1,   duration: 600, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1.1, duration: 600, useNativeDriver: false }),
+        Animated.timing(pulse, { toValue: 1,   duration: 600, useNativeDriver: false }),
       ])
     );
     anim.start();

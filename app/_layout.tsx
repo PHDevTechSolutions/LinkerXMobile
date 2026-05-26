@@ -57,8 +57,10 @@ export default function RootLayout() {
     const socket = getSocket(token);
 
     const joinAndListen = () => {
+      console.log('🔌 Socket connected, joining user room:', socket.id);
       socket.emit('join_user_room');
       socket.on('webrtc_incoming_call', (data: any) => {
+        console.log('📞 Incoming call received:', data);
         setIncomingCall(data);
       });
     };
