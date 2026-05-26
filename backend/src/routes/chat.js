@@ -87,7 +87,7 @@ router.get("/messages", async (req, res) => {
     }
 
     const messages = await db.collection("messages")
-      .find({ chatId })
+      .find({ chatId, hiddenFor: { $ne: req.user.userId } })
       .sort({ createdAt: 1 })
       .toArray();
 
@@ -146,6 +146,88 @@ router.post("/send", async (req, res) => {
     return res.status(201).json({ message: savedMessage });
   } catch (err) {
     console.error("Send message error:", err);
+    return res.status(500).json({ message: "Server error." });
+  }
+});
+
+// PUT /api/chat/messages/:id — edit message text (sender only)
+router.put("/messages/:id", async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ message: "text is required." });
+
+    const db = await connectToDatabase();
+    const msg = await db.collection("messages").findOne({ _id: new ObjectId(req.params.id) });
+    if (!msg) return res.status(404).json({ message: "Message not found." });
+    if (msg.senderId !== req.user.userId) return res.status(403).json({ message: "Not authorized." });
+
+    await db.collection("messages").updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { text: text.trim(), edited: true, editedAt: new Date() } }
+    );
+    return res.status(200).json({ message: "Message updated." });
+  } catch (err) {
+    console.error("Edit message error:", err);
+    return res.status(500).json({ message: "Server error." });
+  }
+});
+
+// DELETE /api/chat/messages/:id — delete for everyone (sender only)
+router.delete("/messages/:id", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const msg = await db.collection("messages").findOne({ _id: new ObjectId(req.params.id) });
+    if (!msg) return res.status(404).json({ message: "Message not found." });
+    if (msg.senderId !== req.user.userId) return res.status(403).json({ message: "Not authorized." });
+
+    await db.collection("messages").deleteOne({ _id: new ObjectId(req.params.id) });
+    return res.status(200).json({ message: "Message deleted." });
+  } catch (err) {
+    console.error("Delete message error:", err);
+    return res.status(500).json({ message: "Server error." });
+  }
+});
+
+// POST /api/chat/messages/:id/hide — delete only for me
+router.post("/messages/:id/hide", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const msg = await db.collection("messages").findOne({ _id: new ObjectId(req.params.id) });
+    if (!msg) return res.status(404).json({ message: "Message not found." });
+
+    // Add current user to hiddenFor array
+    await db.collection("messages").updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $addToSet: { hiddenFor: req.user.userId } }
+    );
+    return res.status(200).json({ message: "Message hidden." });
+  } catch (err) {
+    console.error("Hide message error:", err);
+    return res.status(500).json({ message: "Server error." });
+  }
+});
+
+// POST /api/chat/messages/:id/pin — toggle pin (any participant)
+router.post("/messages/:id/pin", async (req, res) => {
+  try {
+    const db = await connectToDatabase();
+    const msg = await db.collection("messages").findOne({ _id: new ObjectId(req.params.id) });
+    if (!msg) return res.status(404).json({ message: "Message not found." });
+
+    // Verify user is a participant of this chat
+    const chat = await db.collection("chats").findOne({ _id: new ObjectId(msg.chatId) });
+    if (!chat?.participantIds.includes(req.user.userId)) {
+      return res.status(403).json({ message: "Not authorized." });
+    }
+
+    const pinned = !msg.pinned;
+    await db.collection("messages").updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { pinned, pinnedAt: pinned ? new Date() : null } }
+    );
+    return res.status(200).json({ pinned });
+  } catch (err) {
+    console.error("Pin message error:", err);
     return res.status(500).json({ message: "Server error." });
   }
 });
