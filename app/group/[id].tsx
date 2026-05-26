@@ -12,6 +12,7 @@ import { useAuthStore } from '@/store/authStore';
 import { toast } from '@/lib/toast';
 import api from '@/lib/api';
 import { getSocket } from '@/lib/socket';
+import GroupPlaylist from '@/components/GroupPlaylist';
 
 type Member = { _id: string; userName: string; avatar?: string; isAdmin: boolean };
 type GroupMessage = {
@@ -41,6 +42,7 @@ export default function GroupConversation() {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPlaylist, setShowPlaylist]  = useState(false);
   const [isTyping, setIsTyping] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const typingTimeout = useRef<any>(null);
@@ -208,6 +210,9 @@ export default function GroupConversation() {
             </Text>
           </View>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.headerAction} onPress={() => setShowPlaylist(true)}>
+          <Ionicons name="musical-notes-outline" size={20} color={Colors.purple} />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.headerAction} onPress={() => setShowSettings(true)}>
           <Ionicons name="ellipsis-vertical" size={20} color={Colors.textMuted} />
         </TouchableOpacity>
@@ -337,6 +342,13 @@ export default function GroupConversation() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Collaborative Playlist */}
+      <GroupPlaylist
+        groupId={id}
+        visible={showPlaylist}
+        onClose={() => setShowPlaylist(false)}
+      />
     </KeyboardAvoidingView>
   );
 }

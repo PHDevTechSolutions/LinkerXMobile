@@ -18,6 +18,7 @@ import EmojiPicker from '@/components/EmojiPicker';
 import { useColors } from '@/hooks/useColors';
 import { uploadImage, uploadFile, uploadImageFromWeb, uploadFileFromWeb } from '@/lib/cloudinary';
 import LinkPreview from '@/components/LinkPreview';
+import { useActivityStore } from '@/store/activityStore';
 
 // Detect URLs in message text
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/i;
@@ -46,6 +47,7 @@ export default function ChatConversation() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user, token } = useAuthStore();
   const C = useColors();
+  const { getNowPlaying } = useActivityStore();
 
   const [messages, setMessages]       = useState<Message[]>([]);
   const [text, setText]               = useState('');
@@ -60,6 +62,12 @@ export default function ChatConversation() {
   const [editingMsg, setEditingMsg]   = useState<Message | null>(null);
   const [editText, setEditText]       = useState('');
   const [pinnedMsg, setPinnedMsg]     = useState<Message | null>(null);
+
+  // Watch Together state
+  const [watchSession, setWatchSession] = useState<{
+    videoId: string; title: string; thumbnail: string; fromUserId: string;
+  } | null>(null);
+  const [showWatchModal, setShowWatchModal] = useState(false);
 
   const flatListRef   = useRef<FlatList>(null);
   const typingTimeout = useRef<any>(null);
@@ -101,9 +109,21 @@ export default function ChatConversation() {
       }
     });
 
+    // Watch Together
+    socket.on('watch_together_start', (data: any) => {
+      setWatchSession(data);
+      setShowWatchModal(true);
+    });
+    socket.on('watch_together_stop', () => {
+      setWatchSession(null);
+      setShowWatchModal(false);
+    });
+
     return () => {
       socket.off('new_message');
       socket.off('typing');
+      socket.off('watch_together_start');
+      socket.off('watch_together_stop');
       socket.emit('leave_room', id);
     };
   }, [id, token]);
@@ -181,6 +201,31 @@ export default function ChatConversation() {
       ));
       setPinnedMsg(data.pinned ? { ...msg, pinned: true } : null);
     } catch (_) {}
+  };
+
+  // Watch Together — start a session using current music player track
+  const handleStartWatchTogether = () => {
+    const { useMusicStore } = require('@/store/musicStore');
+    const track = useMusicStore.getState().currentTrack;
+    if (!track) return;
+    if (!token) return;
+    const socket = getSocket(token);
+    socket.emit('watch_together_start', {
+      chatId: id,
+      videoId: track.videoId,
+      title: track.title,
+      thumbnail: track.thumbnail,
+    });
+    setWatchSession({ videoId: track.videoId, title: track.title, thumbnail: track.thumbnail, fromUserId: user!._id });
+    setShowWatchModal(true);
+  };
+
+  const handleStopWatchTogether = () => {
+    if (!token) return;
+    const socket = getSocket(token);
+    socket.emit('watch_together_stop', { chatId: id });
+    setWatchSession(null);
+    setShowWatchModal(false);
   };
 
   // ── Image / File pickers ────────────────────────────────────────────────────
@@ -294,6 +339,7 @@ export default function ChatConversation() {
   };
 
   const isMe = contextMenu ? contextMenu.msg.senderId === user?._id : false;
+  const otherUserNowPlaying = otherUser ? getNowPlaying(otherUser._id) : null;
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -317,9 +363,23 @@ export default function ChatConversation() {
           {otherUser && <Avatar uri={otherUser.avatar} name={otherUser.userName} size={36} />}
           <View>
             <Text style={[styles.headerName, { color: C.textPrimary }]}>{otherUser?.userName || '...'}</Text>
-            {isTyping && <Text style={[styles.typingText, { color: C.cyan }]}>typing...</Text>}
+            {isTyping
+              ? <Text style={[styles.typingText, { color: C.cyan }]}>typing...</Text>
+              : otherUserNowPlaying
+                ? <Text style={[styles.nowPlayingText, { color: C.purple }]} numberOfLines={1}>
+                    🎵 {otherUserNowPlaying.title}
+                  </Text>
+                : null
+            }
           </View>
         </View>
+        {/* Watch Together button — only if music is playing */}
+        <TouchableOpacity
+          style={[styles.headerAction, { backgroundColor: watchSession ? C.purpleDim : C.bgElevated }]}
+          onPress={watchSession ? handleStopWatchTogether : handleStartWatchTogether}
+        >
+          <Ionicons name={watchSession ? 'stop-circle-outline' : 'play-circle-outline'} size={20} color={watchSession ? C.purple : C.textMuted} />
+        </TouchableOpacity>
         <TouchableOpacity style={[styles.headerAction, { backgroundColor: C.bgElevated }]}
           onPress={() => router.push(`/call/${otherUser?._id}?type=video&userName=${encodeURIComponent(otherUser?.userName || '')}&avatar=${encodeURIComponent(otherUser?.avatar || '')}` as any)}>
           <Ionicons name="videocam-outline" size={20} color={C.textMuted} />
@@ -499,6 +559,58 @@ export default function ChatConversation() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* ── Watch Together modal ── */}
+      <Modal visible={showWatchModal} transparent animationType="slide" onRequestClose={handleStopWatchTogether}>
+        <View style={[styles.watchOverlay, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+          <View style={[styles.watchModal, { backgroundColor: C.bgCard, borderColor: C.border }]}>
+            {/* Header */}
+            <View style={styles.watchHeader}>
+              <LinearGradient colors={[C.purple, C.cyan]} style={styles.watchHeaderIcon}>
+                <Ionicons name="play-circle" size={20} color="#fff" />
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.watchTitle, { color: C.textPrimary }]}>Watch Together</Text>
+                <Text style={[styles.watchSub, { color: C.textMuted }]}>
+                  {watchSession?.fromUserId === user?._id ? 'You started a session' : `${otherUser?.userName} invited you`}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={handleStopWatchTogether} style={[styles.watchCloseBtn, { backgroundColor: C.bgElevated }]}>
+                <Ionicons name="close" size={18} color={C.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Thumbnail */}
+            {watchSession?.thumbnail && (
+              <View style={styles.watchThumbWrap}>
+                <Image source={{ uri: watchSession.thumbnail }} style={styles.watchThumb} resizeMode="cover" />
+                <View style={styles.watchThumbOverlay}>
+                  <Ionicons name="logo-youtube" size={40} color="#FF0000" />
+                </View>
+              </View>
+            )}
+
+            {/* Track info */}
+            <Text style={[styles.watchVideoTitle, { color: C.textPrimary }]} numberOfLines={2}>
+              {watchSession?.title}
+            </Text>
+
+            {/* Info */}
+            <View style={[styles.watchInfoBox, { backgroundColor: C.bgElevated, borderColor: C.border }]}>
+              <Ionicons name="information-circle-outline" size={16} color={C.textMuted} />
+              <Text style={[styles.watchInfoText, { color: C.textMuted }]}>
+                Both of you are watching the same video in your own Music Player. Play/pause is synced via the music player controls.
+              </Text>
+            </View>
+
+            {/* Stop button */}
+            <TouchableOpacity onPress={handleStopWatchTogether} style={[styles.watchStopBtn, { backgroundColor: C.error + '22', borderColor: C.error + '44' }]}>
+              <Ionicons name="stop-circle-outline" size={18} color={C.error} />
+              <Text style={[styles.watchStopText, { color: C.error }]}>End Watch Together</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -667,4 +779,24 @@ const styles = StyleSheet.create({
   attachGridLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '500' },
   cancelBtn:  { marginTop: 12, paddingVertical: 14, backgroundColor: Colors.bgElevated, borderRadius: 14, alignItems: 'center' },
   cancelText: { color: Colors.textMuted, fontSize: 15, fontWeight: '600' },
+
+  // Now Playing in header
+  nowPlayingText: { fontSize: 11, marginTop: 1, maxWidth: 160 },
+
+  // Watch Together modal
+  watchOverlay:   { flex: 1, justifyContent: 'flex-end' },
+  watchModal:     { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 24, gap: 14 },
+  watchHeader:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  watchHeaderIcon:{ width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  watchTitle:     { fontSize: 16, fontWeight: '700' },
+  watchSub:       { fontSize: 12, marginTop: 2 },
+  watchCloseBtn:  { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  watchThumbWrap: { borderRadius: 14, overflow: 'hidden', height: 160, position: 'relative' },
+  watchThumb:     { width: '100%', height: '100%' },
+  watchThumbOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)' },
+  watchVideoTitle:{ fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  watchInfoBox:   { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12 },
+  watchInfoText:  { flex: 1, fontSize: 12, lineHeight: 18 },
+  watchStopBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingVertical: 12 },
+  watchStopText:  { fontSize: 14, fontWeight: '600' },
 });

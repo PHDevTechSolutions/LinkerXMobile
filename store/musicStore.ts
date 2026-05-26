@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { getItem, setItem } from '@/lib/storage';
 
 export type MusicTrack = {
   videoId: string;
@@ -7,6 +6,18 @@ export type MusicTrack = {
   channelTitle: string;
   thumbnail: string;
 };
+
+// Broadcast now_playing to socket (lazy import to avoid circular deps)
+function broadcastNowPlaying(track: MusicTrack | null) {
+  try {
+    const { useAuthStore } = require('@/store/authStore');
+    const { getSocket } = require('@/lib/socket');
+    const token = useAuthStore.getState().token;
+    if (!token) return;
+    const socket = getSocket(token);
+    socket.emit('now_playing', { track });
+  } catch (_) {}
+}
 
 type MusicState = {
   currentTrack: MusicTrack | null;
@@ -21,7 +32,7 @@ type MusicState = {
   toggleMinimize: () => void;
 };
 
-export const useMusicStore = create<MusicState>((set, get) => ({
+export const useMusicStore = create<MusicState>((set) => ({
   currentTrack: null,
   isPlaying: false,
   isVisible: false,
@@ -29,14 +40,20 @@ export const useMusicStore = create<MusicState>((set, get) => ({
 
   playTrack: (track) => {
     set({ currentTrack: track, isPlaying: true, isVisible: true, isMinimized: false });
+    broadcastNowPlaying(track);
   },
 
   togglePlay: () => {
-    set((s) => ({ isPlaying: !s.isPlaying }));
+    set((s) => {
+      const isPlaying = !s.isPlaying;
+      broadcastNowPlaying(isPlaying ? s.currentTrack : null);
+      return { isPlaying };
+    });
   },
 
   closePlayer: () => {
     set({ currentTrack: null, isPlaying: false, isVisible: false, isMinimized: false });
+    broadcastNowPlaying(null);
   },
 
   toggleMinimize: () => {

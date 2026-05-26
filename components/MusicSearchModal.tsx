@@ -12,11 +12,12 @@ import { useYouTubeSearch } from '@/hooks/useYouTubeSearch';
 type Props = {
   visible: boolean;
   onClose: () => void;
+  onSelectForPlaylist?: (track: MusicTrack) => void; // optional — for group playlist
 };
 
 const QUICK_SEARCHES = ['Lofi hip hop', 'Chill beats', 'OPM hits', 'Study music', 'K-pop', 'EDM mix'];
 
-export default function MusicSearchModal({ visible, onClose }: Props) {
+export default function MusicSearchModal({ visible, onClose, onSelectForPlaylist }: Props) {
   const C = useColors();
   const { playTrack, currentTrack, isPlaying } = useMusicStore();
   const { results, loading, error, search, clear } = useYouTubeSearch();
@@ -36,6 +37,10 @@ export default function MusicSearchModal({ visible, onClose }: Props) {
   }, [search]);
 
   const handlePlay = useCallback((track: MusicTrack) => {
+    if (onSelectForPlaylist) {
+      onSelectForPlaylist(track);
+      return;
+    }
     playTrack(track);
     onClose();
   }, [playTrack, onClose]);

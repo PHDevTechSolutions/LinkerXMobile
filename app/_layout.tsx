@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useCallStore } from '@/store/callStore';
 import { useNotificationStore } from '@/store/notificationStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useActivityStore } from '@/store/activityStore';
 import Toast from '@/components/Toast';
 import IncomingCall from '@/components/IncomingCall';
 import GlobalMusicPlayer from '@/components/MusicPlayer';
@@ -71,6 +72,7 @@ export default function RootLayout() {
   const token    = useAuthStore((s) => s.token);
   const { setIncomingCall } = useCallStore();
   const { addNotification, incrementUnreadMessages } = useNotificationStore();
+  const { setNowPlaying } = useActivityStore();
   const {
     notificationsEnabled, messageNotifications,
     followNotifications, commentNotifications,
@@ -113,11 +115,16 @@ export default function RootLayout() {
       if (data.type === 'message') incrementUnreadMessages();
     };
 
+    const onNowPlaying = (data: any) => {
+      setNowPlaying(data.userId, data.track || null);
+    };
+
     const joinAndListen = () => {
       console.log('🔌 Socket connected, joining user room:', socket.id);
       socket.emit('join_user_room');
       socket.on('webrtc_incoming_call', onIncomingCall);
       socket.on('notification', onNotification);
+      socket.on('user_now_playing', onNowPlaying);
     };
 
     if (socket.connected) {
@@ -130,6 +137,7 @@ export default function RootLayout() {
       socket.off('connect', joinAndListen);
       socket.off('webrtc_incoming_call', onIncomingCall);
       socket.off('notification', onNotification);
+      socket.off('user_now_playing', onNowPlaying);
     };
   }, [token, notificationsEnabled, messageNotifications, followNotifications, commentNotifications]);
 

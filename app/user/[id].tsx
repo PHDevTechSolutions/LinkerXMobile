@@ -10,6 +10,7 @@ import { useColors } from '@/hooks/useColors';
 import Avatar from '@/components/Avatar';
 import PostCard, { Post } from '@/components/PostCard';
 import { useAuthStore } from '@/store/authStore';
+import { useActivityStore } from '@/store/activityStore';
 import { toast } from '@/lib/toast';
 import api from '@/lib/api';
 
@@ -21,6 +22,7 @@ type UserProfile = {
 export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user: me } = useAuthStore();
+  const { getNowPlaying } = useActivityStore();
   const C = useColors();
   const [profile, setProfile]       = useState<UserProfile | null>(null);
   const [posts, setPosts]           = useState<Post[]>([]);
@@ -106,6 +108,19 @@ export default function UserProfileScreen() {
               <Avatar uri={profile.avatar} name={profile.userName} size={84} />
               <Text style={[styles.userName, { color: C.textPrimary }]}>{profile.userName}</Text>
               {profile.bio ? <Text style={[styles.bio, { color: C.textMuted }]}>{profile.bio}</Text> : null}
+
+              {/* Now Playing status */}
+              {(() => {
+                const track = getNowPlaying(profile._id);
+                return track ? (
+                  <View style={[styles.nowPlayingBadge, { backgroundColor: C.purpleDim, borderColor: C.purple + '44' }]}>
+                    <Ionicons name="musical-note" size={13} color={C.purple} />
+                    <Text style={[styles.nowPlayingText, { color: C.purpleLight }]} numberOfLines={1}>
+                      🎵 {track.title}
+                    </Text>
+                  </View>
+                ) : null;
+              })()}
 
               <View style={[styles.statsRow, { backgroundColor: C.bgCard, borderColor: C.border }]}>
                 {[{ label: 'Posts', value: posts.length }, { label: 'Followers', value: profile.followersCount }, { label: 'Following', value: profile.followingCount }]
@@ -195,4 +210,6 @@ const styles = StyleSheet.create({
   postsHeader:    { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, marginTop: 8 },
   postsHeaderText:{ fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
   noPosts:        { alignItems: 'center', marginTop: 40, gap: 10, padding: 16 },
+  nowPlayingBadge:{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5, marginTop: 8, maxWidth: 280 },
+  nowPlayingText: { fontSize: 12, fontWeight: '500', flex: 1 },
 });
