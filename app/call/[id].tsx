@@ -23,40 +23,69 @@ const STUN_SERVERS = {
 };
 
 export default function CallScreen() {
-  const { id, userName = 'User', avatar } = useLocalSearchParams<{
+  const {
+    id,
+    type = 'video',
+    userName = 'User',
+    avatar,
+    incoming = 'false',   // 'true' when receiver accepts from IncomingCall UI
+    callId: paramCallId,  // passed by GlobalIncomingCall when incoming='true'
+  } = useLocalSearchParams<{
     id: string;
     type: 'video' | 'voice';
     userName: string;
     avatar: string;
+    incoming: string;
+    callId: string;
   }>();
 
   const { user, token } = useAuthStore();
-  const [status, setStatus]         = useState<'connecting' | 'ringing' | 'connected' | 'ended'>('connecting');
-  const [muted, setMuted]           = useState(false);
-  const [videoOff, setVideoOff]     = useState(false);
-  const [duration, setDuration]     = useState(0);
+  const [status, setStatus]     = useState<'connecting' | 'ringing' | 'connected' | 'ended'>('connecting');
+  const [muted, setMuted]       = useState(false);
+  const [videoOff, setVideoOff] = useState(false);
+  const [duration, setDuration] = useState(0);
 
   const localVideoRef  = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const pcRef          = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const timerRef       = useRef<any>(null);
-  const callId         = useRef(`call_${id}_${Date.now()}`).current;
-  const isInitialized  = useRef(false); // prevent cleanup before init
+  const timerRef       = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isInitialized  = useRef(false);
+
+  // Callee must reuse the callId from the offer so end_call matches
+  const callId = useRef(
+    incoming === 'true' && paramCallId
+      ? paramCallId
+      : `call_${id}_${Date.now()}`
+  ).current;
+
+  // Buffer ICE candidates that arrive before remote description is set
+  const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]);
+  const remoteDescSet     = useRef(false);
+
+  const drainIceCandidates = useCallback(async (pc: RTCPeerConnection) => {
+    while (iceCandidateQueue.current.length > 0) {
+      const candidate = iceCandidateQueue.current.shift()!;
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.warn('ICE candidate error:', e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!IS_WEB) {
       openMobile();
       return;
     }
-    // Small delay to avoid React strict mode double-invoke issue
     const timeout = setTimeout(() => {
       isInitialized.current = true;
       initWebRTC();
     }, 100);
     return () => {
       clearTimeout(timeout);
-      if (isInitialized.current) cleanup(false); // Don't send end signal on unmount
+      if (isInitialized.current) cleanup(false);
     };
   }, []);
 
@@ -64,11 +93,15 @@ export default function CallScreen() {
     if (status === 'connected') {
       timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
     }
-    return () => clearInterval(timerRef.current);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [status]);
 
   const openMobile = async () => {
-    const url = `${WHEREBY_URL}?displayName=${encodeURIComponent(user?.userName || userName)}&skipMediaPermissionPrompt=on`;
+    const url = `${WHEREBY_URL}?displayName=${encodeURIComponent(
+      user?.userName || userName
+    )}&skipMediaPermissionPrompt=on`;
     try {
       await WebBrowser.openBrowserAsync(url, {
         presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
@@ -81,22 +114,23 @@ export default function CallScreen() {
 
   const initWebRTC = async () => {
     if (!token) return;
+    const socket = getSocket(token);
+
     try {
-      // Get local media
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: type !== 'voice',
+        audio: true,
+      });
       localStreamRef.current = stream;
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
 
-      // Create peer connection
       const pc = new RTCPeerConnection(STUN_SERVERS);
       pcRef.current = pc;
 
-      // Add local tracks
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-      // Handle remote stream
       pc.ontrack = (event) => {
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = event.streams[0];
@@ -104,10 +138,8 @@ export default function CallScreen() {
         }
       };
 
-      // ICE candidates
       pc.onicecandidate = (event) => {
         if (event.candidate) {
-          const socket = getSocket(token);
           socket.emit('webrtc_ice_candidate', {
             targetUserId: id,
             candidate: event.candidate,
@@ -117,64 +149,79 @@ export default function CallScreen() {
       };
 
       pc.onconnectionstatechange = () => {
-        console.log('WebRTC connection state:', pc.connectionState);
-        // Only end on 'failed' — not 'disconnected' which can be temporary
-        if (pc.connectionState === 'failed') {
-          endCall();
-        }
+        console.log('WebRTC state:', pc.connectionState);
+        if (pc.connectionState === 'failed') endCall();
       };
 
       pc.oniceconnectionstatechange = () => {
         console.log('ICE state:', pc.iceConnectionState);
       };
 
-      // Socket signaling
-      const socket = getSocket(token);
-      socket.emit('join_user_room');
+      // ── Socket listeners ──────────────────────────────────────────────
 
-      socket.on('webrtc_answer', async ({ answer }: any) => {
-        await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        setStatus('connected');
-      });
-
-      socket.on('webrtc_ice_candidate', async ({ candidate }: any) => {
-        try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (_) {}
-      });
-
+      // Callee path: receive offer → send answer
       socket.on('webrtc_offer', async ({ fromUserId, offer }: any) => {
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
+        if (!pcRef.current) return;
+        await pcRef.current.setRemoteDescription(new RTCSessionDescription(offer));
+        remoteDescSet.current = true;
+        await drainIceCandidates(pcRef.current);
+        const answer = await pcRef.current.createAnswer();
+        await pcRef.current.setLocalDescription(answer);
         socket.emit('webrtc_answer', { targetUserId: fromUserId, answer, callId });
         setStatus('connected');
       });
 
+      // Caller path: receive answer
+      socket.on('webrtc_answer', async ({ answer }: any) => {
+        if (!pcRef.current || remoteDescSet.current) return;
+        await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+        remoteDescSet.current = true;
+        await drainIceCandidates(pcRef.current);
+        setStatus('connected');
+      });
+
+      // Queue candidates if remote desc not ready yet
+      socket.on('webrtc_ice_candidate', async ({ candidate }: any) => {
+        if (!pcRef.current) return;
+        if (remoteDescSet.current) {
+          try {
+            await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.warn('ICE add error:', e);
+          }
+        } else {
+          iceCandidateQueue.current.push(candidate);
+        }
+      });
+
       socket.on('webrtc_end_call', ({ callId: endedCallId }: any) => {
-        // Only end if it's for this specific call
         if (endedCallId === callId) endCall();
       });
 
-      // Create and send offer with caller info
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socket.emit('webrtc_offer', {
-        targetUserId: id,
-        offer,
-        callId,
-        callerName: user?.userName || 'Unknown',
-        callerAvatar: user?.avatar || null,
-        callType: type,
-      });
+      socket.emit('join_user_room');
+
+      // Caller sends offer; callee (incoming=true) just waits for it
+      if (incoming !== 'true') {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('webrtc_offer', {
+          targetUserId: id,
+          offer,
+          callId,
+          callerName: user?.userName || 'Unknown',
+          callerAvatar: user?.avatar || null,
+          callType: type,
+        });
+      }
       setStatus('ringing');
 
     } catch (err: any) {
       console.error('WebRTC error:', err);
-      // Only end call if it's a real error, not a permission issue
       if (err.name === 'NotAllowedError') {
         setStatus('ended');
         setTimeout(() => router.back(), 500);
       } else {
-        setStatus('ringing'); // Keep ringing even if media fails
+        setStatus('ringing');
       }
     }
   };
@@ -185,18 +232,23 @@ export default function CallScreen() {
     setTimeout(() => router.back(), 1000);
   }, []);
 
+  // Always remove socket listeners regardless of sendEndSignal
   const cleanup = (sendEndSignal = true) => {
-    clearInterval(timerRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     pcRef.current?.close();
     pcRef.current = null;
-    if (sendEndSignal && token && isInitialized.current) {
+
+    if (token) {
       const socket = getSocket(token);
       socket.off('webrtc_offer');
       socket.off('webrtc_answer');
       socket.off('webrtc_ice_candidate');
       socket.off('webrtc_end_call');
-      socket.emit('webrtc_end_call', { targetUserId: id, callId });
+
+      if (sendEndSignal && isInitialized.current) {
+        socket.emit('webrtc_end_call', { targetUserId: id, callId });
+      }
     }
   };
 
@@ -211,13 +263,18 @@ export default function CallScreen() {
   };
 
   const formatDuration = (s: number) =>
-    `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+    `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60)
+      .toString()
+      .padStart(2, '0')}`;
 
-  // ── Mobile: loading while opening browser ────────────────────────────────
+  // ── Mobile UI ─────────────────────────────────────────────────────────
   if (!IS_WEB) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={[Colors.purple + '55', Colors.bg]} style={StyleSheet.absoluteFill} />
+        <LinearGradient
+          colors={[Colors.purple + '55', Colors.bg]}
+          style={StyleSheet.absoluteFill}
+        />
         <View style={styles.center}>
           <Avatar uri={avatar} name={userName} size={90} />
           <Text style={styles.callerName}>{userName}</Text>
@@ -231,46 +288,55 @@ export default function CallScreen() {
     );
   }
 
-  // ── Web: full WebRTC UI ───────────────────────────────────────────────────
+  // ── Web WebRTC UI ─────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* Remote video — full screen */}
       {status === 'connected' ? (
         <video
           ref={remoteVideoRef}
           autoPlay
           playsInline
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000' } as any}
+          style={{
+            position: 'absolute', top: 0, left: 0,
+            width: '100%', height: '100%',
+            objectFit: 'cover', backgroundColor: '#000',
+          } as any}
         />
       ) : (
-        <LinearGradient colors={[Colors.purple + '55', Colors.bg]} style={StyleSheet.absoluteFill}>
+        <LinearGradient
+          colors={[Colors.purple + '55', Colors.bg]}
+          style={StyleSheet.absoluteFill}
+        >
           <View style={styles.center}>
             <Avatar uri={avatar} name={userName} size={90} />
             <Text style={styles.callerName}>{userName}</Text>
             <Text style={styles.callStatus}>
               {status === 'connecting' ? 'Connecting...' :
-               status === 'ringing'    ? 'Ringing...' :
+               status === 'ringing'    ? (incoming === 'true' ? 'Connecting to caller...' : 'Ringing...') :
                status === 'ended'      ? 'Call ended' : ''}
             </Text>
-            {status !== 'ended' && <ActivityIndicator color={Colors.purple} style={{ marginTop: 12 }} />}
+            {status !== 'ended' && (
+              <ActivityIndicator color={Colors.purple} style={{ marginTop: 12 }} />
+            )}
           </View>
         </LinearGradient>
       )}
 
-      {/* Local video — small preview */}
-      {status === 'connected' && !videoOff && (
+      {status === 'connected' && !videoOff && type !== 'voice' && (
         <View style={styles.localVideoWrap}>
           <video
             ref={localVideoRef}
             autoPlay
             playsInline
             muted
-            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 } as any}
+            style={{
+              width: '100%', height: '100%',
+              objectFit: 'cover', borderRadius: 12,
+            } as any}
           />
         </View>
       )}
 
-      {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => router.back()} style={styles.topBtn}>
           <Ionicons name="chevron-down" size={24} color={Colors.white} />
@@ -284,7 +350,6 @@ export default function CallScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Controls */}
       <View style={styles.controls}>
         <TouchableOpacity style={styles.controlBtn} onPress={toggleMute}>
           <View style={[styles.controlBtnInner, muted && styles.controlBtnActive]}>
@@ -293,16 +358,27 @@ export default function CallScreen() {
           <Text style={styles.controlLabel}>{muted ? 'Unmute' : 'Mute'}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.controlBtn} onPress={toggleVideo}>
-          <View style={[styles.controlBtnInner, videoOff && styles.controlBtnActive]}>
-            <Ionicons name={videoOff ? 'videocam-off' : 'videocam'} size={24} color={Colors.white} />
-          </View>
-          <Text style={styles.controlLabel}>{videoOff ? 'Show' : 'Hide'}</Text>
-        </TouchableOpacity>
+        {type !== 'voice' && (
+          <TouchableOpacity style={styles.controlBtn} onPress={toggleVideo}>
+            <View style={[styles.controlBtnInner, videoOff && styles.controlBtnActive]}>
+              <Ionicons
+                name={videoOff ? 'videocam-off' : 'videocam'}
+                size={24}
+                color={Colors.white}
+              />
+            </View>
+            <Text style={styles.controlLabel}>{videoOff ? 'Show' : 'Hide'}</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={styles.controlBtn} onPress={endCall}>
           <View style={styles.endCallBtn}>
-            <Ionicons name="call" size={26} color={Colors.white} style={{ transform: [{ rotate: '135deg' }] }} />
+            <Ionicons
+              name="call"
+              size={26}
+              color={Colors.white}
+              style={{ transform: [{ rotate: '135deg' }] }}
+            />
           </View>
           <Text style={styles.controlLabel}>End</Text>
         </TouchableOpacity>

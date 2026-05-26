@@ -9,6 +9,7 @@ import Toast from '@/components/Toast';
 import IncomingCall from '@/components/IncomingCall';
 import { useToastStore } from '@/lib/toast';
 import { getSocket } from '@/lib/socket';
+// ✅ removed unused useIncomingCall import
 
 function GlobalToast() {
   const { visible, message, type, hide } = useToastStore();
@@ -21,14 +22,22 @@ function GlobalIncomingCall() {
 
   const handleAccept = () => {
     setIncomingCall(null);
-    router.push(`/call/${incomingCall.callerId}?type=${incomingCall.callType}&userName=${encodeURIComponent(incomingCall.callerName)}&incoming=true&callId=${incomingCall.callId}` as any);
+    // ✅ pass incoming=true and callId so CallScreen reuses the same callId
+    router.push(
+      `/call/${incomingCall.callerId}?type=${incomingCall.callType}&userName=${encodeURIComponent(
+        incomingCall.callerName
+      )}&incoming=true&callId=${incomingCall.callId}` as any
+    );
   };
 
   const handleDecline = () => {
     const { token } = useAuthStore.getState();
     if (token) {
       const socket = getSocket(token);
-      socket.emit('webrtc_end_call', { targetUserId: incomingCall.callerId, callId: incomingCall.callId });
+      socket.emit('webrtc_end_call', {
+        targetUserId: incomingCall.callerId,
+        callId: incomingCall.callId,
+      });
     }
     setIncomingCall(null);
   };
@@ -65,11 +74,9 @@ export default function RootLayout() {
       });
     };
 
-    // If already connected, join immediately
     if (socket.connected) {
       joinAndListen();
     } else {
-      // Wait for connection
       socket.on('connect', joinAndListen);
     }
 
