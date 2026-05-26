@@ -2,15 +2,12 @@
  * AI utilities for LinkerX
  *
  * Text generation : Groq API (llama-3.1-8b-instant) — free, 14,400 req/day
- * Image generation: Stability AI (Stable Diffusion) — free credits included
+ * Image generation: Pollinations.ai (FLUX model) — completely free, unlimited, no key needed
  */
 
-const GROQ_KEY       = process.env.EXPO_PUBLIC_GROQ_API_KEY;
-const STABILITY_KEY  = process.env.EXPO_PUBLIC_STABILITY_API_KEY;
-
-const GROQ_BASE      = 'https://api.groq.com/openai/v1';
-const STABILITY_BASE = 'https://api.stability.ai/v2beta/stable-image/generate/core';
-const MODEL          = 'llama-3.1-8b-instant';
+const GROQ_KEY  = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+const GROQ_BASE = 'https://api.groq.com/openai/v1';
+const MODEL     = 'llama-3.1-8b-instant';
 
 // ─── Groq text generation ─────────────────────────────────────────────────────
 
@@ -63,39 +60,18 @@ export async function improvePostContent(text: string): Promise<string> {
   );
 }
 
-// ─── Stability AI image generation ───────────────────────────────────────────
+// ─── Pollinations.ai image generation (free, unlimited, no key needed) ────────
 
 export async function generateImage(prompt: string): Promise<string> {
-  if (!STABILITY_KEY) {
-    throw new Error('Stability AI key not configured.');
-  }
+  // Pollinations.ai generates images via URL — no API key, no billing, no limits
+  const encoded = encodeURIComponent(prompt);
+  const seed    = Math.floor(Math.random() * 999999);
+  const url     = `https://image.pollinations.ai/prompt/${encoded}?width=512&height=512&seed=${seed}&model=flux&nologo=true&enhance=true`;
 
-  const formData = new FormData();
-  formData.append('prompt', prompt);
-  formData.append('output_format', 'png');
-  formData.append('aspect_ratio', '1:1');
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Image generation failed. Try a different prompt.');
 
-  const res = await fetch(STABILITY_BASE, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${STABILITY_KEY}`,
-      'Accept': 'image/*',
-    },
-    body: formData,
-  });
-
-  if (!res.ok) {
-    let msg = `Stability AI error ${res.status}`;
-    try {
-      const err = await res.json();
-      msg = err.errors?.[0] || err.message || msg;
-    } catch (_) {}
-    console.error('[Stability Error]', msg);
-    throw new Error(msg);
-  }
-
-  // Response is raw image bytes — convert to base64 data URI
-  const blob   = await res.blob();
+  const blob = await res.blob();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result as string);
