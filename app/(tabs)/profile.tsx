@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, RefreshControl,
-  Image, Platform,
+  Image, Platform, Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -268,6 +268,21 @@ export default function ProfileScreen() {
           ))}
         </View>
 
+        {/* ── Download APK ── */}
+        <TouchableOpacity
+          style={[styles.apkBtn, { backgroundColor: C.bgCard, borderColor: C.cyan + '50' }]}
+          onPress={() => Linking.openURL('https://expo.dev/accounts/phdevtechsolutions/projects/linkerx-mobile/builds')}
+        >
+          <LinearGradient colors={[C.cyan, C.purple]} style={styles.apkIcon}>
+            <Ionicons name="download-outline" size={20} color={C.white} />
+          </LinearGradient>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.apkLabel, { color: C.textPrimary }]}>Download Android APK</Text>
+            <Text style={[styles.apkSub, { color: C.textMuted }]}>Install LinkerX on your Android device</Text>
+          </View>
+          <Ionicons name="open-outline" size={16} color={C.textMuted} />
+        </TouchableOpacity>
+
         {/* ── Logout ── */}
         <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: C.bgCard, borderColor: C.error + '40' }]} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color={C.error} />
@@ -366,7 +381,16 @@ const styles = StyleSheet.create({
     padding: 16, borderWidth: 1, borderColor: Colors.error + '40',
   },
   logoutText: { color: Colors.error, fontWeight: '600', fontSize: 15 },
-  miniPlayBtn: {
-    padding: 2,
+  miniPlayBtn: { padding: 2 },
+  apkBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: 14, padding: 14, borderWidth: 1,
+    marginBottom: 12,
   },
+  apkIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  apkLabel: { fontSize: 15, fontWeight: '600' },
+  apkSub: { fontSize: 12, marginTop: 2 },
 });
