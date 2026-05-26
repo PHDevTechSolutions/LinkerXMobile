@@ -8,7 +8,7 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao",
-        "EXPO_PUBLIC_GEMINI_API_KEY": "AIzaSyDyuRGDNbcz50l67-zXSZunc3v1FMYtbgQ"
+        "EXPO_PUBLIC_GROQ_API_KEY": "YOUR_GROQ_API_KEY_HERE"
       }
     },
     "preview": {
@@ -18,7 +18,7 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao",
-        "EXPO_PUBLIC_GEMINI_API_KEY": "AIzaSyDyuRGDNbcz50l67-zXSZunc3v1FMYtbgQ"
+        "EXPO_PUBLIC_GROQ_API_KEY": "YOUR_GROQ_API_KEY_HERE"
       }
     },
     "production": {
@@ -27,7 +27,7 @@
       },
       "env": {
         "EXPO_PUBLIC_YOUTUBE_API_KEY": "AIzaSyD9UUrulCfQpVrHsBPqvyGTzgfVyGDOmao",
-        "EXPO_PUBLIC_GEMINI_API_KEY": "AIzaSyDyuRGDNbcz50l67-zXSZunc3v1FMYtbgQ"
+        "EXPO_PUBLIC_GROQ_API_KEY": "YOUR_GROQ_API_KEY_HERE"
       }
     }
   },

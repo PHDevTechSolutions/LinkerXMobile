@@ -47,7 +47,9 @@ export default function AiPostPanel({ visible, onClose, currentText, onApplyText
         setImgUri(uri);
       }
     } catch (err: any) {
-      toast.error(err.message || 'AI generation failed.');
+      const msg = err.message || 'AI generation failed.';
+      console.error('[Gemini Error]', msg);
+      toast.error(msg.length > 80 ? msg.slice(0, 80) + '...' : msg);
     } finally {
       setLoading(false);
     }
@@ -107,8 +109,8 @@ export default function AiPostPanel({ visible, onClose, currentText, onApplyText
               <Ionicons name="sparkles" size={18} color="#fff" />
             </LinearGradient>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.headerTitle, { color: C.textPrimary }]}>Gemini AI</Text>
-              <Text style={[styles.headerSub, { color: C.textMuted }]}>Powered by Google</Text>
+              <Text style={[styles.headerTitle, { color: C.textPrimary }]}>AI Assistant</Text>
+              <Text style={[styles.headerSub, { color: C.textMuted }]}>Powered by Groq + Llama 3.1</Text>
             </View>
             <TouchableOpacity onPress={handleClose} style={[styles.closeBtn, { backgroundColor: C.bgElevated }]}>
               <Ionicons name="close" size={18} color={C.textMuted} />
