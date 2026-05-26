@@ -55,13 +55,14 @@ export default function CallScreen() {
   const [videoOff, setVideoOff] = useState(false);
   const [duration, setDuration] = useState(0);
 
-  const localVideoRef  = useRef<HTMLVideoElement | null>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
-  const pcRef          = useRef<RTCPeerConnection | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const timerRef       = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isInitialized  = useRef(false);
-  const endedRef       = useRef(false); // guard against double-cleanup
+  const localVideoRef   = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef  = useRef<HTMLVideoElement | null>(null);
+  const pcRef           = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef  = useRef<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null); // keep stream alive
+  const timerRef        = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isInitialized   = useRef(false);
+  const endedRef        = useRef(false); // guard against double-cleanup
 
   // Callee reuses the same callId so webrtc_end_call matches on both sides
   const callId = useRef(
@@ -187,9 +188,11 @@ export default function CallScreen() {
 
       // Remote track → show remote video
       pc.ontrack = (event) => {
-        console.log('🎥 Got remote track');
+        console.log('🎥 Got remote track:', event.track.kind);
+        const stream = event.streams[0];
+        remoteStreamRef.current = stream; // persist so late-mounting video gets it
         if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
+          remoteVideoRef.current.srcObject = stream;
         }
         setStatus('connected');
       };
@@ -331,6 +334,15 @@ export default function CallScreen() {
     }
   }, []);
 
+  // Attach remote stream to video element once it mounts (handles late mount)
+  // This fires when status changes to 'connected' and the video becomes visible
+  const setRemoteVideoRef = useCallback((el: HTMLVideoElement | null) => {
+    remoteVideoRef.current = el;
+    if (el && remoteStreamRef.current) {
+      el.srcObject = remoteStreamRef.current;
+    }
+  }, []);
+
   const formatDuration = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60)
       .toString()
@@ -360,9 +372,9 @@ export default function CallScreen() {
   // ── Web WebRTC UI ─────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {/* Remote video — always rendered so ref is always attached */}
+      {/* Remote video — always rendered so ref callback fires immediately on mount */}
       <video
-        ref={remoteVideoRef}
+        ref={setRemoteVideoRef}
         autoPlay
         playsInline
         style={{
