@@ -3,6 +3,8 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { connectToDatabase } = require("../db");
 
+const authMiddleware = require("../middleware/auth");
+
 const router = express.Router();
 
 // POST /api/register
@@ -87,6 +89,35 @@ router.post("/login", async (req, res) => {
     });
   } catch (err) {
     console.error("Login error:", err);
+    return res.status(500).json({ message: "Server error." });
+  }
+});
+
+// POST /api/change-password (authenticated)
+router.post("/change-password", authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword)
+      return res.status(400).json({ message: "Both fields are required." });
+    if (newPassword.length < 6)
+      return res.status(400).json({ message: "New password must be at least 6 characters." });
+
+    const db = await connectToDatabase();
+    const { ObjectId } = require("mongodb");
+    const user = await db.collection("users").findOne({ _id: new ObjectId(req.user.userId) });
+    if (!user) return res.status(404).json({ message: "User not found." });
+
+    const isValid = await bcrypt.compare(currentPassword, user.Password);
+    if (!isValid) return res.status(401).json({ message: "Current password is incorrect." });
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await db.collection("users").updateOne(
+      { _id: new ObjectId(req.user.userId) },
+      { $set: { Password: hashed, updatedAt: new Date() } }
+    );
+    return res.status(200).json({ message: "Password changed successfully." });
+  } catch (err) {
+    console.error("Change password error:", err);
     return res.status(500).json({ message: "Server error." });
   }
 });
